@@ -6,7 +6,7 @@ const fs = require('fs');
 
 // let cookies;
 
-let cookies = JSON.parse(fs.readFileSync('cookies.json', 'utf8'));
+let cookies = JSON.parse(fs.readFileSync('nytcookies.json', 'utf8'));
 
 async function login(browser) {
   console.log('Step: Open new page');
