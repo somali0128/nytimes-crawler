@@ -72,7 +72,7 @@ async function continueHeadless(browser) {
   // Set cookies
   await page.setCookie(...cookies);
   await page.goto('https://nytimes.com/', {
-    timeout: 100000,
+    timeout: 1000000,
   });
 
   const [button] = await page.$x("//button[contains(., 'Continue')]");

@@ -1,19 +1,18 @@
-const { namespaceWrapper } = require('../namespaceWrapper');
+const { namespaceWrapper } = require('../_koiiNode/koiiNode');
 
 /**
  * Data class
- * 
+ *
  * @param {string} name - the name of the database
  * @param {object} data - the initial data to be stored in the database
- * 
+ *
  * @returns {Data} - a Data object
- * 
+ *
  */
 
 class Data {
-  constructor(name, data) {
+  constructor(name) {
     this.name = name;
-    this.data = data;
     this.dbprefix = `${name} + ":"`;
     this.fullList = [];
     this.lastUpdate = Date.now();
@@ -24,14 +23,12 @@ class Data {
    * @returns {void}
    */
   async initializeData() {
-    if (this.db) return;
-    const db = await namespaceWrapper.getDb();
-    this.db = db;
+    this.db = await namespaceWrapper.getDb();
   }
 
   /**
    * create
-   * @param {*} item 
+   * @param {*} item
    * @returns {void}
    */
   async create(item) {
@@ -42,11 +39,11 @@ class Data {
       return undefined;
     }
   }
-  
+
   /**
    * getItem
-   * @param {*} item 
-   * @returns 
+   * @param {*} item
+   * @returns
    * @description gets an item from the database by ID (CID)
    */
   async getItem(item) {
@@ -66,9 +63,9 @@ class Data {
 
   /**
    * getList
-   * @param {*} options 
-   * @returns 
-   * @description gets a list of items from the database by ID (CID) 
+   * @param {*} options
+   * @returns
+   * @description gets a list of items from the database by ID (CID)
    * or by round
    */
   async getList(options) {
@@ -76,19 +73,16 @@ class Data {
     let itemListRaw;
     if (!options) {
       itemListRaw = await this.db.find({ item: { $exists: true } });
-      
     } else {
-      if ( options.round ) {
-        console.log('has round', options.round)
+      if (options.round) {
+        console.log('has round', options.round);
         // itemListRaw = await this.db.find({ item: { $exists: true } });
         itemListRaw = await this.db.find({ round: options.round });
-      
       }
     }
     // let itemList = itemListRaw.map(itemList => itemList.item);
     return itemListRaw;
   }
-
 }
 
 module.exports = Data;

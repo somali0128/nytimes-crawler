@@ -4,7 +4,7 @@ const datadb = require('../helpers/db');
 
 
 
-const Item = require('../model/item');
+const Item = require('../../model/item');
 
 const testData = [
   new Item({ id: 1, name: 'Item 1', description: 'First item' }),

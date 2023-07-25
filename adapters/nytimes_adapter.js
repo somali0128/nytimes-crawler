@@ -1,21 +1,20 @@
 // Import required modules
-const Adapter = require('../../model/adapter');
-const puppeteer = require('puppeteer');
-const PCR = require("puppeteer-chromium-resolver");
+const Adapter = require('../model/adapter');
+const PCR = require('puppeteer-chromium-resolver');
 const cheerio = require('cheerio');
-var crypto = require('crypto');
 const { Web3Storage, File } = require('web3.storage');
-const Data = require('../../model/data');
+const Data = require('../model/data');
+const fs = require('fs');
 
 /**
- * Twitter
+ * Nytimes
  * @class
  * @extends Adapter
  * @description
- * Provides a crawler interface for the data gatherer nodes to use to interact with twitter
+ * Provides a crawler interface for the data gatherer nodes to use to interact with nytimes
  */
 
-class Twitter extends Adapter {
+class Nytimes extends Adapter {
   constructor(credentials, db, maxRetry) {
     super(credentials, maxRetry);
     this.credentials = credentials;
@@ -30,13 +29,14 @@ class Twitter extends Adapter {
     this.lastSessionCheck = null;
     this.sessionValid = false;
     this.browser = null;
+    this.cookies = JSON.parse(fs.readFileSync('nytcookies.json', 'utf8'));
   }
 
   /**
    * checkSession
    * @returns {Promise<boolean>}
    * @description
-   * 1. Check if the session is still valid 
+   * 1. Check if the session is still valid
    * 2. If the session is still valid, return true
    * 3. If the session is not valid, check if the last session check was more than 1 minute ago
    * 4. If the last session check was more than 1 minute ago, negotiate a new session
@@ -48,11 +48,11 @@ class Twitter extends Adapter {
       await this.negotiateSession();
       return true;
     } else {
-      return false; 
+      return false;
     }
   };
 
-  /** 
+  /**
    * negotiateSession
    * @returns {Promise<void>}
    * @description
@@ -60,34 +60,49 @@ class Twitter extends Adapter {
    * 2. Launch a new browser instance
    * 3. Open a new page
    * 4. Set the viewport size
-   * 5. Queue twitterLogin()
+   * 5. Queue nytimesLogin()
    */
   negotiateSession = async () => {
     const options = {};
     const stats = await PCR(options);
 
-    this.browser = await stats.puppeteer.launch({ 
+    this.browser = await stats.puppeteer.launch({
       headless: false,
-      executablePath: stats.executablePath 
+      executablePath: stats.executablePath,
     });
 
-    console.log('Step: Open new page');
+    console.log('Step: Open NYT page');
     this.page = await this.browser.newPage();
-    await this.page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36');
-    
-    
-    // TODO - Enable console logs in the context of the page and export them for diagnostics here
+    await this.page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36',
+    );
+
     await this.page.setViewport({ width: 1920, height: 1000 });
-    await this.twitterLogin();
+
+    // Set cookies
+    await this.page.setCookie(...this.cookies);
+    await this.page.goto('https://nytimes.com/', {
+      timeout: 1000000,
+    });
+
+    const [button] = await this.page.$x("//button[contains(., 'Continue')]");
+    if (!button) {
+      console.log('Test failed');
+      // TODO: If log in failed, close browser => open a headless:false browser => ask user login => save the cookies => run it again with new cookie
+      // await this.nytimesLogin();
+      return true
+    }
+
+    await this.page.waitForTimeout(100000000);
 
     return true;
   };
 
   /**
-   * twitterLogin
+   * nytimesLogin
    * @returns {Promise<void>}
    * @description
-   * 1. Go to twitter.com
+   * 1. Go to nytimes.com
    * 2. Go to login page
    * 3. Fill in username
    * 4. Fill in password
@@ -98,53 +113,61 @@ class Twitter extends Adapter {
    * 9. If login was unsuccessful, return false
    * 10. If login was unsuccessful, try again
    */
-  twitterLogin = async () => {
-    console.log('Step: Go to nytimes.com');
-    // console.log('isBrowser?', this.browser, 'isPage?', this.page);
-    await this.page.goto('https://nytimes.com');
-    
-    console.log('Step: Go to login page');
-    // await this.page.goto('https://myaccount.nytimes.com/auth/login');
-    
-    console.log('Step: Fill in username');
-    console.log(this.credentials.username);
-
-    await this.page.waitForSelector('input[autocomplete="username"]', {timeout:1000000000});
-    await this.page.type(
-      'input[autocomplete="username"]',
-      this.credentials.username,
+  nytimesLogin = async () => {
+    console.log('Step: Open new page');
+    let page = await browser.newPage();
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36',
     );
-    await this.page.keyboard.press('Enter');
 
-    const twitter_verify = await this.page
-      .waitForSelector('input[data-testid="ocfEnterTextTextInput"]', {
-        timeout: 5000,
-        visible: true,
-      })
-      .then(() => true)
-      .catch(() => false);
+    // TODO - Enable console logs in the context of the page and export them for diagnostics here
+    await page.setViewport({ width: 1920, height: 1000 });
 
-    if (twitter_verify) {
-      await this.page.type(
-        'input[data-testid="ocfEnterTextTextInput"]',
-        this.credentials.username,
-      );
-      await this.page.keyboard.press('Enter');
+    //   await page.goto('https://www.nytimes.com/', { timeout: 1000000 });
+
+    await page.waitForTimeout(3346);
+    await page.goto(
+      'https://myaccount.nytimes.com/auth/login?response_type=cookie',
+      {
+        timeout: 100000,
+      },
+    );
+
+    for (let i = 0; i < 100; i++) {
+      try {
+        const emailField = await page.$('#email');
+        if (emailField) {
+          console.log('Email inbox found');
+          console.log('Step: Type email and press Enter');
+          await page.type('#email', this.credentials.username);
+          console.log('Email found');
+          await page.keyboard.press('Enter');
+          await page.waitForNavigation({ timeout: 5000 });
+          break;
+        } else {
+          console.log('Email inbox not found' + i);
+          await page.waitForTimeout(3000);
+        }
+      } catch (err) {
+        console.log('Caught navigation error', err);
+      }
     }
 
-    console.log('Step: Fill in password');
-    await this.page.waitForSelector('input[name="password"]');
-    await this.page.type('input[name="password"]', this.credentials.password);
-    await this.page.keyboard.press('Enter');
-
-    // TODO - catch unsuccessful login and retry up to query.maxRetry 
-    console.log('Step: Click login button');
-    this.page.waitForNavigation({ waitUntil: 'load' });
-    await this.page.waitForTimeout(1000);
-
-    this.sessionValid = true;
-    this.lastSessionCheck = Date.now();
-
+    await page.waitForTimeout(2185);
+    console.log('Step: Type password and press Enter');
+    await page.type('#password', this.credentials.password);
+    console.log('Password found');
+    await page.keyboard.press('Enter');
+    await page.waitForNavigation({ timeout: 1000000 });
+    const [button] = await page.$x("//button[contains(., 'Continue')]");
+    if (button) {
+      await button.click();
+    }
+    // Wait for one second before trying again
+    await page.waitForTimeout(3456);
+    cookies = await page.cookies();
+    fs.writeFileSync('cookies.json', JSON.stringify(cookies, null, 2));
+    await page.close();
     console.log('Step: Login successful');
 
     return true;
@@ -163,35 +186,28 @@ class Twitter extends Adapter {
       let proof_cid = await this.proofs.getItem(round);
       console.log('got proofs item', proof_cid);
       if (proof_cid) {
-
         console.log('returning proof cid A', proof_cid);
         return proof_cid;
-
       } else {
-
         // we need to upload proofs for that round and then store the cid
         const data = await this.cids.getList({ round: round });
         console.log(`got cids list for round ${round}`, data);
 
         if (data && data.length === 0) {
-
           throw new Error('No cids found for round ' + round);
           return null;
-
         } else {
-
           const file = await makeFileFromObjectWithName(data, 'round:' + round);
           const cid = await storeFiles([file]);
 
           await this.proofs.create({
-            id : "proof:" + round,
+            id: 'proof:' + round,
             proof_round: round,
             proof_cid: cid,
           }); // TODO - add better ID structure here
 
           console.log('returning proof cid B', cid);
           return cid;
-
         }
       }
     } else {
@@ -204,11 +220,10 @@ class Twitter extends Adapter {
    * @param {string} url - the url of the item to parse
    * @param {object} query - the query object to use for parsing
    * @returns {object} - the parsed item
-   * @description - this function should parse the item at the given url and return the parsed item data 
+   * @description - this function should parse the item at the given url and return the parsed item data
    *               according to the query object and for use in either crawl() or validate()
    */
   parseItem = async (url, query) => {
-
     if (!this.sessionValid) {
       await this.negotiateSession();
     }
@@ -253,7 +268,7 @@ class Twitter extends Adapter {
       // get the comments and other attached tweet items and queue them
       articles.slice(1).forEach(async el => {
         const tweet_user = $(el).find('a[tabindex="-1"]').text();
-        let newQuery = `https://twitter.com/search?q=${encodeURIComponent(
+        let newQuery = `https://nytimes.com/search?q=${encodeURIComponent(
           tweet_user,
         )}%20${query.searchTerm}&src=typed_query`;
         if (query.isRecursive)
@@ -274,7 +289,7 @@ class Twitter extends Adapter {
     this.toCrawl = await this.fetchList(query.query);
     console.log('round is', query.round, query.updateRound);
     console.log(`about to crawl ${this.toCrawl.length} items`);
-    this.parsed = []; 
+    this.parsed = [];
 
     console.log(
       'test',
@@ -290,7 +305,7 @@ class Twitter extends Adapter {
         var data = await this.parseItem(url, query);
         this.parsed[url] = data;
 
-        console.log('got tweet item', data)
+        console.log('got tweet item', data);
 
         const file = await makeFileFromObjectWithName(data, url);
         const cid = await storeFiles([file]);
@@ -299,12 +314,12 @@ class Twitter extends Adapter {
           round: round || 0,
           cid: cid,
         });
-        
+
         if (query.recursive === true) {
           const newLinks = await this.fetchList(url);
           this.toCrawl = this.toCrawl.concat(newLinks);
         }
-      } 
+      }
     }
   };
 
@@ -320,11 +335,11 @@ class Twitter extends Adapter {
     // Go to the hashtag page
     await this.page.waitForTimeout(1000);
     await this.page.setViewport({ width: 1920, height: 10000 });
-    await this.page.goto(url, );
+    await this.page.goto(url);
 
     // Wait an additional 5 seconds until fully loaded before scraping
     await this.page.waitForTimeout(5000);
-    
+
     // Scrape the tweets
     const html = await this.page.content();
     const $ = cheerio.load(html);
@@ -342,7 +357,7 @@ class Twitter extends Adapter {
 
     const linkStrings = [];
     matchedLinks.forEach(link => {
-      linkStrings.push('https://twitter.com' + $(link).attr('href'));
+      linkStrings.push('https://nytimes.com' + $(link).attr('href'));
     });
 
     const uniqueLinks = getUnique(linkStrings);
@@ -358,7 +373,7 @@ class Twitter extends Adapter {
    * @param {string[]} links
    * @returns {Promise<void>}
    * @description Processes a list of links
-   * @todo Implement this function 
+   * @todo Implement this function
    * @todo Implement a way to queue links
    */
   processLinks = async links => {
@@ -375,10 +390,7 @@ class Twitter extends Adapter {
   };
 }
 
-module.exports = Twitter;
-
-
-
+module.exports = Nytimes;
 
 // TODO - move the following functions to a utils file?
 function makeStorageClient() {
@@ -386,7 +398,7 @@ function makeStorageClient() {
 }
 
 async function makeFileFromObjectWithName(obj, name) {
-  console.log('making file from', typeof(obj), name);
+  console.log('making file from', typeof obj, name);
   obj.url = name;
   const buffer = Buffer.from(JSON.stringify(obj));
   console.log('buffer is', buffer);
