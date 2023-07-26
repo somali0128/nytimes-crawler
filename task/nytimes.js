@@ -2,7 +2,7 @@ require('dotenv').config();
 const Data = require('../model/data');
 const Nytimes = require('../adapters/nytimes_adapter');
 
-async function main() {
+async function main(round) {
     let credentials = {
         username: process.env.NYTIMES_USERNAME,
         password: process.env.NYTIMES_PASSWORD
@@ -13,7 +13,7 @@ async function main() {
 
     await adapter.negotiateSession();
 
-    await adapter.crawl()
+    await adapter.crawl(round)
 
     return 1;
 }

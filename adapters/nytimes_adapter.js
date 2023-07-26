@@ -3,6 +3,9 @@ const Adapter = require('../model/adapter');
 const PCR = require('puppeteer-chromium-resolver');
 const cheerio = require('cheerio');
 const { Web3Storage, File } = require('web3.storage');
+const storageClient = new Web3Storage({
+  token: process.env.SECRET_WEB3_STORAGE_KEY,
+});
 const Data = require('../model/data');
 const fs = require('fs');
 
@@ -182,7 +185,7 @@ class Nytimes extends Adapter {
    * @returns {Promise<string[]>}
    * @description Crawls the queue of known links
    */
-  crawl = async () => {
+  crawl = async round => {
     if (!this.sessionValid) {
       await this.negotiateSession();
     }
@@ -191,7 +194,7 @@ class Nytimes extends Adapter {
       await this.fetchList();
     }
 
-    await this.parseItem();
+    await this.parseItem(round);
 
     return true;
   };
@@ -250,7 +253,7 @@ class Nytimes extends Adapter {
    * @description - this function should parse the item at the given url and return the parsed item data
    *               according to the query object and for use in either crawl() or validate()
    */
-  parseItem = async () => {
+  parseItem = async round => {
     if (!this.sessionValid) {
       await this.negotiateSession();
     }
@@ -289,7 +292,10 @@ class Nytimes extends Adapter {
         for (let article of this.articles) {
           if (article.link === link) {
             article.author = author;
-            await this. getSubmissionCID(article.title);
+            article.lastUpdate = new Date().toISOString().split('T')[0];
+            let cid = await this.getArticleCID(round, article, articleContent);
+            article.cid = cid;
+            await this.db.create(article);
             break;
           }
         }
@@ -297,9 +303,7 @@ class Nytimes extends Adapter {
         // remove the link from the toCrawl array
         this.toCrawl = this.toCrawl.filter(item => item !== link);
       }
-
       console.log(this.articles);
-
       return true;
     } catch (err) {
       console.log('ERROR IN PARSE ITEM' + err);
@@ -308,44 +312,39 @@ class Nytimes extends Adapter {
   };
 
   /**
-   * getSubmissionCID
-   * @param {string} round - the round to get the submission cid for
-   * @returns {string} - the cid of the submission
-   * @description - this function should return the cid of the submission for the given round
-   * if the submission has not been uploaded yet, it should upload it and return the cid
+   * getArticleCID
+   * @param {string} round - the round to get the Article cid for
+   * @returns {string} - the cid of the Article
+   * @description - this function should return the cid of the Article for the given round
+   * if the Article has not been uploaded yet, it should upload it and return the cid
    */
-  getSubmissionCID = async round => {
-    if (this.proofs) {
-      // check if the cid has already been stored
-      let proof_cid = await this.proofs.getItem(round);
-      console.log('got proofs item', proof_cid);
-      if (proof_cid) {
-        console.log('returning proof cid A', proof_cid);
-        return proof_cid;
-      } else {
-        // we need to upload proofs for that round and then store the cid
-        const data = await this.cids.getList({ round: round });
-        console.log(`got cids list for round ${round}`, data);
+  getArticleCID = async (round, article, articleContent) => {
+    try {
+      const encoder = new TextEncoder();
 
-        if (data && data.length === 0) {
-          throw new Error('No cids found for round ' + round);
-          return null;
-        } else {
-          const file = await makeFileFromObjectWithName(data, 'round:' + round);
-          const cid = await storeFiles([file]);
+      const articleContentEncoded = encoder.encode(articleContent);
+      const articleFile = new File(
+        [articleContentEncoded],
+        `${article.title}.txt`,
+        {
+          type: 'text/plain;charset=UTF-8',
+        },
+      );
 
-          await this.proofs.create({
-            id: 'proof:' + round,
-            proof_round: round,
-            proof_cid: cid,
-          }); // TODO - add better ID structure here
+      const articleMetaEncoded = encoder.encode(JSON.stringify(article));
+      const articleMeta = new File(
+        [articleMetaEncoded],
+        `${article.title}.json`,
+        {
+          type: 'application/json;charset=UTF-8',
+        },
+      );
 
-          console.log('returning proof cid B', cid);
-          return cid;
-        }
-      }
-    } else {
-      throw new Error('No proofs database provided');
+      const cid = await storageClient.put([articleFile, articleMeta]);
+      return cid;
+    } catch (err) {
+      console.log('ERROR IN GET ARTICLE CID' + err);
+      return false;
     }
   };
 
