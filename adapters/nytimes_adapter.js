@@ -18,12 +18,13 @@ class Nytimes extends Adapter {
   constructor(credentials, db, maxRetry) {
     super(credentials, maxRetry);
     this.credentials = credentials;
-    this.db = new Data('db', []);
+    this.db = db;
     this.db.initializeData();
-    this.proofs = new Data('proofs', []);
+    this.proofs = new Data('proofs');
     this.proofs.initializeData();
-    this.cids = new Data('cids', []);
+    this.cids = new Data('cids');
     this.cids.initializeData();
+    this.articles = [];
     this.toCrawl = [];
     this.parsed = {};
     this.lastSessionCheck = null;
@@ -87,13 +88,15 @@ class Nytimes extends Adapter {
 
     const [button] = await this.page.$x("//button[contains(., 'Continue')]");
     if (!button) {
-      console.log('Test failed');
+      console.log('Test Passed');
+      this.sessionValid = true;
       // TODO: If log in failed, close browser => open a headless:false browser => ask user login => save the cookies => run it again with new cookie
       // await this.nytimesLogin();
-      return true
+      return true;
     }
+    this.sessionValid = true;
 
-    await this.page.waitForTimeout(100000000);
+    await this.page.waitForTimeout(10000000);
 
     return true;
   };
@@ -174,6 +177,137 @@ class Nytimes extends Adapter {
   };
 
   /**
+   * crawl
+   * @param {string} query
+   * @returns {Promise<string[]>}
+   * @description Crawls the queue of known links
+   */
+  crawl = async () => {
+    if (!this.sessionValid) {
+      await this.negotiateSession();
+    }
+
+    if (this.toCrawl.length === 0) {
+      await this.fetchList();
+    }
+
+    await this.parseItem();
+
+    return true;
+  };
+
+  /**
+   * fetchList
+   * @param {string} url
+   * @returns {Promise<string[]>}
+   * @description Fetches a list of links from a given url
+   */
+  fetchList = async () => {
+    if (!this.sessionValid) {
+      await this.negotiateSession();
+    }
+    try {
+      const html = await this.page.content();
+      const $ = cheerio.load(html);
+      const self = this;
+
+      $('section.story-wrapper a').each(
+        function (i, elem) {
+          const link = $(elem).attr('href');
+          const title = $(elem).find('h3.indicate-hover').text();
+          const description = $(elem).find('p.summary-class').text();
+
+          // check if link, title and description are not undefined or empty
+          if (
+            link &&
+            !link.includes('https://theathletic.com/') &&
+            !link.includes('https://www.nytimes.com/video/') &&
+            !link.includes('https://www.nytimes.com/live/') &&
+            (title || description)
+          ) {
+            self.articles.push({
+              title,
+              description,
+              link,
+            });
+            self.toCrawl.push(link);
+          }
+        }.bind(this),
+      );
+
+      return true;
+    } catch (err) {
+      console.log(err);
+      return false;
+    }
+  };
+
+  /**
+   * parseItem
+   * @param {string} url - the url of the item to parse
+   * @param {object} query - the query object to use for parsing
+   * @returns {object} - the parsed item
+   * @description - this function should parse the item at the given url and return the parsed item data
+   *               according to the query object and for use in either crawl() or validate()
+   */
+  parseItem = async () => {
+    if (!this.sessionValid) {
+      await this.negotiateSession();
+    }
+    try {
+      console.log('Step: Parse Item');
+      console.log('To parse', this.toCrawl.length);
+
+      await this.page.setJavaScriptEnabled(false);
+
+      // crawl each link in the toCrawl array
+      for (const link of this.toCrawl) {
+        await this.page.goto(link, {
+          timeout: 10000,
+          waitUntil: 'domcontentloaded',
+        });
+        await Promise.race([
+          this.page.waitForSelector('article#story'),
+          this.page.waitForSelector(
+            'article.live-blog-content.meteredContent[data-testid="live-blog-content"]',
+          ),
+        ]);
+
+        const articleHtml = await this.page.content();
+        const _$ = cheerio.load(articleHtml);
+
+        const author = _$('.authorPageLinkClass').text();
+        let articleContent = '';
+
+        _$('section[name="articleBody"] .StoryBodyCompanionColumn').each(
+          function (i, element) {
+            articleContent += _$(this).text() + '\n\n';
+          },
+        );
+
+        // find the corresponding article in the articles array and add the author to it
+        for (let article of this.articles) {
+          if (article.link === link) {
+            article.author = author;
+            await this. getSubmissionCID(article.title);
+            break;
+          }
+        }
+
+        // remove the link from the toCrawl array
+        this.toCrawl = this.toCrawl.filter(item => item !== link);
+      }
+
+      console.log(this.articles);
+
+      return true;
+    } catch (err) {
+      console.log('ERROR IN PARSE ITEM' + err);
+      return false;
+    }
+  };
+
+  /**
    * getSubmissionCID
    * @param {string} round - the round to get the submission cid for
    * @returns {string} - the cid of the submission
@@ -216,171 +350,6 @@ class Nytimes extends Adapter {
   };
 
   /**
-   * parseItem
-   * @param {string} url - the url of the item to parse
-   * @param {object} query - the query object to use for parsing
-   * @returns {object} - the parsed item
-   * @description - this function should parse the item at the given url and return the parsed item data
-   *               according to the query object and for use in either crawl() or validate()
-   */
-  parseItem = async (url, query) => {
-    if (!this.sessionValid) {
-      await this.negotiateSession();
-    }
-
-    await this.page.setViewport({ width: 1920, height: 10000 });
-
-    console.log('PARSE: ' + url, query);
-    await this.page.goto(url);
-    await this.page.waitForTimeout(2000);
-
-    console.log('PARSE: ' + url);
-    const html = await this.page.content();
-    const $ = cheerio.load(html);
-    let data = {};
-    var count = 0;
-
-    const articles = $('article[data-testid="tweet"]').toArray();
-
-    const el = articles[0];
-    const tweet_text = $(el).find('div[data-testid="tweetText"]').text();
-    const tweet_user = $(el).find('a[tabindex="-1"]').text();
-    const tweet_record = $(el).find(
-      'span[data-testid="app-text-transition-container"]',
-    );
-    const commentCount = tweet_record.eq(0).text();
-    const likeCount = tweet_record.eq(1).text();
-    const shareCount = tweet_record.eq(2).text();
-    const viewCount = tweet_record.eq(3).text();
-    if (tweet_user && tweet_text) {
-      data = {
-        user: tweet_user,
-        content: tweet_text.replace(/\n/g, '<br>'),
-        comment: commentCount,
-        like: likeCount,
-        share: shareCount,
-        view: viewCount,
-      };
-    }
-    // TODO  - queue users to be crawled?
-
-    if (query) {
-      // get the comments and other attached tweet items and queue them
-      articles.slice(1).forEach(async el => {
-        const tweet_user = $(el).find('a[tabindex="-1"]').text();
-        let newQuery = `https://nytimes.com/search?q=${encodeURIComponent(
-          tweet_user,
-        )}%20${query.searchTerm}&src=typed_query`;
-        if (query.isRecursive)
-          this.toCrawl.push(await this.fetchList(newQuery));
-      });
-    }
-
-    return data;
-  };
-
-  /**
-   * crawl
-   * @param {string} query
-   * @returns {Promise<string[]>}
-   * @description Crawls the queue of known links
-   */
-  crawl = async query => {
-    this.toCrawl = await this.fetchList(query.query);
-    console.log('round is', query.round, query.updateRound);
-    console.log(`about to crawl ${this.toCrawl.length} items`);
-    this.parsed = [];
-
-    console.log(
-      'test',
-      this.parsed.length < query.limit,
-      this.parsed.length,
-      query.limit,
-    );
-
-    while (this.parsed.length < query.limit && !this.break) {
-      let round = await query.updateRound();
-      const url = this.toCrawl.shift();
-      if (url) {
-        var data = await this.parseItem(url, query);
-        this.parsed[url] = data;
-
-        console.log('got tweet item', data);
-
-        const file = await makeFileFromObjectWithName(data, url);
-        const cid = await storeFiles([file]);
-        this.cids.create({
-          id: url,
-          round: round || 0,
-          cid: cid,
-        });
-
-        if (query.recursive === true) {
-          const newLinks = await this.fetchList(url);
-          this.toCrawl = this.toCrawl.concat(newLinks);
-        }
-      }
-    }
-  };
-
-  /**
-   * fetchList
-   * @param {string} url
-   * @returns {Promise<string[]>}
-   * @description Fetches a list of links from a given url
-   */
-  fetchList = async url => {
-    console.log('fetching list for ', url);
-
-    // Go to the hashtag page
-    await this.page.waitForTimeout(1000);
-    await this.page.setViewport({ width: 1920, height: 10000 });
-    await this.page.goto(url);
-
-    // Wait an additional 5 seconds until fully loaded before scraping
-    await this.page.waitForTimeout(5000);
-
-    // Scrape the tweets
-    const html = await this.page.content();
-    const $ = cheerio.load(html);
-
-    const links = $('a').toArray();
-
-    console.log(`got ${links.length} links`);
-
-    // Filter the matching elements with the specified pattern
-    const matchedLinks = links.filter(link => {
-      const href = $(link).attr('href');
-      const regex = /\/status\/\d+[^/]*$/;
-      return regex.test(href);
-    });
-
-    const linkStrings = [];
-    matchedLinks.forEach(link => {
-      linkStrings.push('https://nytimes.com' + $(link).attr('href'));
-    });
-
-    const uniqueLinks = getUnique(linkStrings);
-    uniqueLinks.forEach(link => {
-      console.log('fetchlist link:', link);
-    });
-
-    return uniqueLinks;
-  };
-
-  /**
-   * processLinks
-   * @param {string[]} links
-   * @returns {Promise<void>}
-   * @description Processes a list of links
-   * @todo Implement this function
-   * @todo Implement a way to queue links
-   */
-  processLinks = async links => {
-    links.forEach(link => {});
-  };
-
-  /**
    * stop
    * @returns {Promise<boolean>}
    * @description Stops the crawler
@@ -391,61 +360,3 @@ class Nytimes extends Adapter {
 }
 
 module.exports = Nytimes;
-
-// TODO - move the following functions to a utils file?
-function makeStorageClient() {
-  return new Web3Storage({ token: getAccessToken() });
-}
-
-async function makeFileFromObjectWithName(obj, name) {
-  console.log('making file from', typeof obj, name);
-  obj.url = name;
-  const buffer = Buffer.from(JSON.stringify(obj));
-  console.log('buffer is', buffer);
-  return new File([buffer], 'data.json', { type: 'application/json' });
-}
-
-async function storeFiles(files) {
-  const client = makeStorageClient();
-  const cid = await client.put(files);
-  console.log('stored files with cid:', cid);
-  return cid;
-}
-
-// TODO - use this properly as a sub-flow in this.parseItem()
-const parseTweet = async tweet => {
-  // console.log('new tweet!', tweet)
-  let item = {
-    id: tweet.id,
-    data: tweet,
-    list: getIdListFromTweet(tweet),
-  };
-
-  return item;
-};
-
-const getIdListFromTweet = tweet => {
-  // parse the tweet for IDs from comments and replies and return an array
-
-  return [];
-};
-
-function getUnique(array) {
-  return [...new Set(array)];
-}
-
-function idFromUrl(url, round) {
-  return round + ':' + url;
-}
-
-function getAccessToken() {
-  // If you're just testing, you can paste in a token
-  // and uncomment the following line:
-  // return 'paste-your-token-here'
-
-  // In a real app, it's better to read an access token from an
-  // environement variable or other configuration that's kept outside of
-  // your code base. For this to work, you need to set the
-  // WEB3STORAGE_TOKEN environment variable before you run your code.
-  return process.env.WEB3STORAGE_TOKEN;
-}

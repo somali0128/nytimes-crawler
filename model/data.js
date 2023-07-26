@@ -12,8 +12,7 @@ const { namespaceWrapper } = require('../_koiiNode/koiiNode');
 
 class Data {
   constructor(name) {
-    this.name = name;
-    this.dbprefix = `${name} + ":"`;
+    this.name = `${name} + ":"`;
     this.fullList = [];
     this.lastUpdate = Date.now();
   }

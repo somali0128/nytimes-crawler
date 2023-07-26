@@ -8,10 +8,12 @@ async function main() {
         password: process.env.NYTIMES_PASSWORD
     }
 
-    let db = new Data ('nytimes')
-    let adapter = new Nytimes(credentials, db, 3);
+    let nytimesDB = new Data ('nytimes')
+    let adapter = new Nytimes(credentials, nytimesDB, 3);
 
-    // await adapter.negotiateSession();
+    await adapter.negotiateSession();
+
+    await adapter.crawl()
 
     return 1;
 }
