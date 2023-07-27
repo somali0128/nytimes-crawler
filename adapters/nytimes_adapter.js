@@ -8,6 +8,7 @@ const storageClient = new Web3Storage({
 });
 const Data = require('../model/data');
 const fs = require('fs');
+const nytcookies = require('../nytcookies.json');
 
 /**
  * Nytimes
@@ -33,7 +34,7 @@ class Nytimes extends Adapter {
     this.lastSessionCheck = null;
     this.sessionValid = false;
     this.browser = null;
-    this.cookies = JSON.parse(fs.readFileSync('nytcookies.json', 'utf8'));
+    this.cookies = nytcookies;
   }
 
   /**
@@ -78,7 +79,7 @@ class Nytimes extends Adapter {
     console.log('Step: Open NYT page');
     this.page = await this.browser.newPage();
     await this.page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36',
+      'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
     );
 
     await this.page.setViewport({ width: 1920, height: 1000 });
