@@ -221,11 +221,14 @@ class Nytimes extends Adapter {
           const description = $(elem).find('p.summary-class').text();
 
           // check if link, title and description are not undefined or empty
+          // TODO: we need another option to fetch the following list of links
           if (
             link &&
             !link.includes('https://theathletic.com/') &&
             !link.includes('https://www.nytimes.com/video/') &&
             !link.includes('https://www.nytimes.com/live/') &&
+            !link.includes('https://www.nytimes.com/interactive/') &&
+            !link.includes('https://www.nytimes.com/explain/') &&
             (title || description)
           ) {
             self.articles.push({
@@ -279,23 +282,50 @@ class Nytimes extends Adapter {
         const articleHtml = await this.page.content();
         const _$ = cheerio.load(articleHtml);
 
-        const author = _$('.authorPageLinkClass').text();
-        let articleContent = '';
+        const author = _$('span[itemprop="name"]').text();
+        // Select the article#story element
+        let articleContent = _$('article#story');
 
-        _$('section[name="articleBody"] .StoryBodyCompanionColumn').each(
-          function (i, element) {
-            articleContent += _$(this).text() + '\n\n';
-          },
-        );
+        // Remove the div elements with id that starts with 'story-ad-'
+        articleContent.find('div[id^="story-ad-"]').remove();
+        articleContent.find('div[data-testid="brand-bar"]').remove();
+        articleContent.find('div#sponsor-wrapper').remove();
+        articleContent.find('div#top-wrapper').remove();
+        articleContent.find('div#bottom-wrapper').remove();
+        articleContent.find('div[role="toolbar"]').remove();
+
+        // Get the modified HTML content
+        articleContent = _$('<div>').append(articleContent).html();
+
+        articleContent =
+          '<meta charset="UTF-8">' +
+          articleContent.replace(/’/g, "'").replace(/—/g, '--');
+
+        // _$('section[name="articleBody"] .StoryBodyCompanionColumn').each(
+        //   function (i, element) {
+        //     articleContent += _$(this).text() + '\n\n';
+        //   },
+        // );
 
         // find the corresponding article in the articles array and add the author to it
         for (let article of this.articles) {
           if (article.link === link) {
             article.author = author;
-            article.lastUpdate = new Date().toISOString().split('T')[0];
-            let cid = await this.getArticleCID(round, article, articleContent);
-            article.cid = cid;
+            article.releaseDate = await this.extractDateFromURL(article.link);
+            // let cid = await this.getArticleCID(round, article, articleContent);
+            article.cid = "cid";
             await this.db.create(article);
+
+            // TEST:Use fs write the articleContent to a file, name is article title
+            fs.writeFileSync(
+              `./articles/${article.title}.html`,
+              articleContent,
+            );
+            fs.writeFileSync(
+              `./articles/${article.title}.json`,
+              JSON.stringify(article),
+            );
+
             break;
           }
         }
@@ -312,6 +342,20 @@ class Nytimes extends Adapter {
   };
 
   /**
+   * extractDateFromURL
+   * @param {string} url
+   * @returns
+   */
+  extractDateFromURL = async url => {
+    // The URL is split into an array of strings using '/' as the separator
+    const splitURL = url.split('/');
+
+    // We know that the date parts are at the indices 3, 4 and 5 of the array
+    const [year, month, day] = splitURL.slice(3, 6);
+
+    return `${year}-${month}-${day}`;
+  };
+  /**
    * getArticleCID
    * @param {string} round - the round to get the Article cid for
    * @returns {string} - the cid of the Article
@@ -325,9 +369,9 @@ class Nytimes extends Adapter {
       const articleContentEncoded = encoder.encode(articleContent);
       const articleFile = new File(
         [articleContentEncoded],
-        `${article.title}.txt`,
+        `${article.title}.html`,
         {
-          type: 'text/plain;charset=UTF-8',
+          type: 'text/html;charset=UTF-8',
         },
       );
 
