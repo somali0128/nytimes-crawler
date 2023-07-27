@@ -71,7 +71,7 @@ class Nytimes extends Adapter {
     const stats = await PCR(options);
 
     this.browser = await stats.puppeteer.launch({
-      headless: false,
+      headless: 'new',
       executablePath: stats.executablePath,
     });
 

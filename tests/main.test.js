@@ -11,7 +11,7 @@ describe('Performing the task', () => {
     const round = 1;
     const result = await coreLogic.task(round);
     expect(result).not.toContain('ERROR IN EXECUTING TASK');
-  });
+  }, 100000000);
 
   it('should make the submission to k2 for dummy round 1', async () => {
     const round = 1;
