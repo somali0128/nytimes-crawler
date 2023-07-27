@@ -1,16 +1,10 @@
 const { namespaceWrapper } = require('../_koiiNode/koiiNode');
-const { main } = require('./nytimes');
+const { main, submit } = require('./nytimes');
 class Submission {
   async task(round) {
-
     try {
-      const value = await main();
-
-      if (value) {
-        // store value on NeDB
-        // await namespaceWrapper.storeSet('value', value);
-      }
-      return value;
+      const articleListCid = await main(round);
+      return articleListCid;
     } catch (err) {
       console.log('ERROR IN EXECUTING TASK', err);
       return 'ERROR IN EXECUTING TASK' + err;
@@ -39,17 +33,14 @@ class Submission {
   }
 
   async fetchSubmission(round) {
-    // Write the logic to fetch the submission values here and return the cid string
-
-    // fetching round number to store work accordingly
-
     console.log('IN FETCH SUBMISSION');
-
-    // The code below shows how you can fetch your stored value from level DB
-
-    const value = await namespaceWrapper.storeGet('value'); // retrieves the value
-    console.log('VALUE', value);
-    return value;
+    try {
+      const submission = await submit(round);
+      return submission || null;
+    } catch (err) {
+      console.log('ERROR IN FETCHING SUBMISSION', err);
+      return 'ERROR IN FETCHING SUBMISSION' + err;
+    }
   }
 }
 const submission = new Submission();

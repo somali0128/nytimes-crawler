@@ -186,17 +186,22 @@ class Nytimes extends Adapter {
    * @description Crawls the queue of known links
    */
   crawl = async round => {
-    if (!this.sessionValid) {
-      await this.negotiateSession();
+    try {
+      if (!this.sessionValid) {
+        await this.negotiateSession();
+      }
+
+      if (this.toCrawl.length === 0) {
+        await this.fetchList();
+      }
+
+      await this.parseItem(round);
+
+      return this.articles;
+    } catch (err) {
+      console.log('ERROR IN CRAWL' + err);
+      return false;
     }
-
-    if (this.toCrawl.length === 0) {
-      await this.fetchList();
-    }
-
-    await this.parseItem(round);
-
-    return true;
   };
 
   /**
@@ -312,19 +317,19 @@ class Nytimes extends Adapter {
           if (article.link === link) {
             article.author = author;
             article.releaseDate = await this.extractDateFromURL(article.link);
-            // let cid = await this.getArticleCID(round, article, articleContent);
-            article.cid = "cid";
+            let cid = await this.getArticleCID(round, article, articleContent);
+            article.cid = cid;
             await this.db.create(article);
 
             // TEST:Use fs write the articleContent to a file, name is article title
-            fs.writeFileSync(
-              `./articles/${article.title}.html`,
-              articleContent,
-            );
-            fs.writeFileSync(
-              `./articles/${article.title}.json`,
-              JSON.stringify(article),
-            );
+            // fs.writeFileSync(
+            //   `./articles/${article.title}.html`,
+            //   articleContent,
+            // );
+            // fs.writeFileSync(
+            //   `./articles/${article.title}.json`,
+            //   JSON.stringify(article),
+            // );
 
             break;
           }
@@ -333,7 +338,7 @@ class Nytimes extends Adapter {
         // remove the link from the toCrawl array
         this.toCrawl = this.toCrawl.filter(item => item !== link);
       }
-      console.log(this.articles);
+      // console.log(this.articles);
       return true;
     } catch (err) {
       console.log('ERROR IN PARSE ITEM' + err);

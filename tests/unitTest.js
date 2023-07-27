@@ -5,8 +5,8 @@ const index = require('../index');
 async function test_coreLogic() {
   const round = 11111;
   await coreLogic.task(round);
-  // const submission = await coreLogic.submitTask(round);
-  // console.log('Receive test submission', submission);
+  const submission = await coreLogic.submitTask(round);
+  console.log('Receive test submission', submission);
   // const audit = await task.audit.validateNode(submission, round);
   // let vote = true;
   // const _dummyTaskState = {

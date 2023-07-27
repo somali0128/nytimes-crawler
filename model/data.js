@@ -41,19 +41,15 @@ class Data {
 
   /**
    * getItem
-   * @param {*} item
+   * @param {*} round
    * @returns
    * @description gets an item from the database by ID (CID)
    */
-  async getItem(item) {
-    console.log('trying to retrieve with ID', item);
+  async getItem(round) {
+    console.log('trying to retrieve with ID', {round});
     try {
-      const resp = await this.db.findOne({ item });
-      if (resp) {
-        return resp.item;
-      } else {
-        return null;
-      }
+      const resp = await this.db.findOne({ round });
+      return resp || null;
     } catch (e) {
       console.error(e);
       return null;
