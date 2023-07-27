@@ -4,10 +4,12 @@ const index = require('../index');
 
 async function test_coreLogic() {
   const round = 11111;
-  await coreLogic.task(round);
-  const submission = await coreLogic.submitTask(round);
-  console.log('Receive test submission', submission);
-  // const audit = await task.audit.validateNode(submission, round);
+  // await coreLogic.task(round);
+  // const submission = await coreLogic.submitTask(round);
+  const submission = 'bafybeigceb5q6s7o2klp224aphi33pbtakmtopubvl6d3t4wpjeo5kux4i'
+  // console.log('Receive test submission', submission);
+  const vote = await task.audit.validateNode(submission, round);
+  console.log('Receive test vote', vote);
   // let vote = true;
   // const _dummyTaskState = {
   //   stake_list: {
@@ -60,7 +62,7 @@ async function test_coreLogic() {
   //     },
   //   },
   // };
-  // if (audit == true) {
+  // if (vote == true) {
   //   console.log('Submission is valid, generating distribution list');
   //   await coreLogic.submitDistributionList(round);
 
