@@ -8,7 +8,7 @@ const storageClient = new Web3Storage({
 });
 const Data = require('../model/data');
 const fs = require('fs');
-const nytcookies = require('../nytcookies.json');
+const nytcookies = require('./nytcookies');
 
 /**
  * Nytimes
@@ -72,7 +72,7 @@ class Nytimes extends Adapter {
     const stats = await PCR(options);
 
     this.browser = await stats.puppeteer.launch({
-      headless: false,
+      headless: 'new',
       executablePath: stats.executablePath,
     });
 
