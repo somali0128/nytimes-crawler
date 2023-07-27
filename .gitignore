@@ -10,8 +10,4 @@ namespace/*
 config/*
 .env
 taskStateInfoKeypair.json
-localKOIIDB
-my_test_db
-twitter-db
-.DS_Store
 localKOIIDB.db
