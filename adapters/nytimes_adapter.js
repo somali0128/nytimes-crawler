@@ -2,6 +2,7 @@
 const Adapter = require('../model/adapter');
 const PCR = require('puppeteer-chromium-resolver');
 const cheerio = require('cheerio');
+const crypto = require('crypto');
 const { Web3Storage, File } = require('web3.storage');
 const storageClient = new Web3Storage({
   token: process.env.SECRET_WEB3_STORAGE_KEY,
@@ -289,6 +290,14 @@ class Nytimes extends Adapter {
         const _$ = cheerio.load(articleHtml);
 
         const author = _$('span[itemprop="name"]').text();
+
+
+        let articleText = '';
+
+        _$('div.StoryBodyCompanionColumn').each(function(i, elem) {
+          articleText += _$(this).text() + ' ';
+        });
+
         // Select the article#story element
         let articleContent = _$('article#story');
 
@@ -307,19 +316,14 @@ class Nytimes extends Adapter {
           '<meta charset="UTF-8">' +
           articleContent.replace(/’/g, "'").replace(/—/g, '--');
 
-        // _$('section[name="articleBody"] .StoryBodyCompanionColumn').each(
-        //   function (i, element) {
-        //     articleContent += _$(this).text() + '\n\n';
-        //   },
-        // );
-
         // find the corresponding article in the articles array and add the author to it
         for (let article of this.articles) {
           if (article.link === link) {
             article.author = author;
             article.releaseDate = await this.extractDateFromURL(article.link);
-            let cid = await this.getArticleCID(round, article, articleContent);
-            article.cid = cid;
+            // let cid = await this.getArticleCID(round, article, articleContent);
+            article.contentHash = await this.hashText(articleText);
+            article.cid = 'cid';
             await this.db.create(article);
 
             // TEST:Use fs write the articleContent to a file, name is article title
@@ -330,6 +334,10 @@ class Nytimes extends Adapter {
             // fs.writeFileSync(
             //   `./articles/${article.title}.json`,
             //   JSON.stringify(article),
+            // );
+            // fs.writeFileSync(
+            //   `./articles/${article.title.split('/').join('-')}.txt`,
+            //   articleText,
             // );
 
             break;
@@ -361,6 +369,18 @@ class Nytimes extends Adapter {
 
     return `${year}-${month}-${day}`;
   };
+
+  /**
+   * hashText
+   * @param {string} text - the text to hash
+   * @returns {Promise<boolean>}
+   * @description - this function should return the hash of the given text
+   */
+  hashText = async text => {
+    return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+  }
+  
+
   /**
    * getArticleCID
    * @param {string} round - the round to get the Article cid for
