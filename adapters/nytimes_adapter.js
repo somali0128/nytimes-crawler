@@ -20,7 +20,7 @@ const nytcookies = require('./nytcookies');
  */
 
 class Nytimes extends Adapter {
-  constructor(credentials, db, maxRetry) {
+  constructor(credentials, db, maxRetry, locale, debug) {
     super(credentials, maxRetry);
     this.credentials = credentials;
     this.db = db;
@@ -36,6 +36,8 @@ class Nytimes extends Adapter {
     this.sessionValid = false;
     this.browser = null;
     this.cookies = nytcookies;
+    this.locale = locale || 'US';
+    this.debug = debug || false;
   }
 
   /**
@@ -72,8 +74,9 @@ class Nytimes extends Adapter {
     const options = {};
     const stats = await PCR(options);
 
+    const headless = this.debug === 'true' ? false : 'new';
     this.browser = await stats.puppeteer.launch({
-      headless: 'new',
+      headless: headless,
       executablePath: stats.executablePath,
     });
 
@@ -87,21 +90,32 @@ class Nytimes extends Adapter {
 
     // Set cookies
     await this.page.setCookie(...this.cookies);
-    await this.page.goto('https://nytimes.com/', {
-      timeout: 1000000,
-    });
+
+    // Check locale
+    if (this.locale == 'CN') {
+      await this.page.goto('https://cn.nytimes.com/', {
+        timeout: 1000000,
+      });
+    } else if (this.locale == 'ES') {
+      await this.page.goto('https://www.nytimes.com/es/', {
+        timeout: 1000000,
+      });
+    } else {
+      await this.page.goto('https://www.nytimes.com/', {
+        timeout: 1000000,
+      });
+    }
 
     const [button] = await this.page.$x("//button[contains(., 'Continue')]");
     if (!button) {
-      console.log('Test Passed');
+      console.log('Cookie Passed');
       this.sessionValid = true;
       // TODO: If log in failed, close browser => open a headless:false browser => ask user login => save the cookies => run it again with new cookie
       // await this.nytimesLogin();
+      // await this.page.waitForTimeout(1000000000);
       return true;
     }
     this.sessionValid = true;
-
-    await this.page.waitForTimeout(10000000);
 
     return true;
   };
@@ -196,7 +210,7 @@ class Nytimes extends Adapter {
       if (this.toCrawl.length === 0) {
         await this.fetchList();
       }
-
+      console.log('Step: Crawl');
       await this.parseItem(round);
 
       return this.articles;
@@ -220,41 +234,102 @@ class Nytimes extends Adapter {
       const html = await this.page.content();
       const $ = cheerio.load(html);
       const self = this;
-
-      $('section.story-wrapper a').each(
-        function (i, elem) {
-          const link = $(elem).attr('href');
-          const title = $(elem).find('h3.indicate-hover').text();
-          const description = $(elem).find('p.summary-class').text();
-
-          // check if link, title and description are not undefined or empty
-          // TODO: we need another option to fetch the following list of links
-          if (
-            link &&
-            !link.includes('https://theathletic.com/') &&
-            !link.includes('https://www.nytimes.com/video/') &&
-            !link.includes('https://www.nytimes.com/live/') &&
-            !link.includes('https://www.nytimes.com/interactive/') &&
-            !link.includes('https://www.nytimes.com/explain/') &&
-            (title || description)
-          ) {
-            self.articles.push({
-              title,
-              description,
-              link,
-            });
-            self.toCrawl.push(link);
-          }
-        }.bind(this),
-      );
-
-      return true;
+      if (this.locale === 'CN') {
+        return await this.fetchCNList($, self);
+      } else if (this.locale === 'ES') {
+      } else {
+        return await this.fetchUSList($, self);
+      }
     } catch (err) {
       console.log(err);
       return false;
     }
   };
 
+  /**
+   * fetchUSList will fethc the list under the US section
+   * @param {string} $ - the cheerio object
+   * @param {object} self - the this object
+   * @returns true
+   */
+  fetchUSList = async ($, self) => {
+    console.log('Fetching US List');
+    $('section.story-wrapper a').each(
+      function (i, elem) {
+        const link = $(elem).attr('href');
+        const title = $(elem).find('h3.indicate-hover').text();
+        const description = $(elem).find('p.summary-class').text();
+
+        // check if link, title and description are not undefined or empty
+        // TODO: we need another option to fetch the following list of links
+        if (
+          link &&
+          !link.includes('https://theathletic.com/') &&
+          !link.includes('https://www.nytimes.com/video/') &&
+          !link.includes('https://www.nytimes.com/live/') &&
+          !link.includes('https://www.nytimes.com/interactive/') &&
+          !link.includes('https://www.nytimes.com/explain/') &&
+          (title || description)
+        ) {
+          self.articles.push({
+            title,
+            description,
+            link,
+          });
+          self.toCrawl.push(link);
+        }
+      }.bind(this),
+    );
+
+    return true;
+  };
+
+  /**
+   * fetchCNList will fethc the list under the CN section
+   * @param {string} $ - the cheerio object
+   * @param {object} self - the this object
+   * @returns true
+   */
+  fetchCNList = async ($, self) => {
+    console.log('Fetching CN List');
+    $('div.leadNewsContainer').each(
+      function (i, elem) {
+        const titleElement = $(elem).find('h2.leadHeadline a');
+        const title = titleElement.text();
+        const link = 'https://cn.nytimes.com' + titleElement.attr('href');
+        const description = $(elem).find('p.summary').text();
+
+        if (link && (title || description)) {
+          self.articles.push({
+            title,
+            description,
+            link,
+          });
+          self.toCrawl.push(link);
+        }
+      }.bind(this),
+    );
+
+    $('ul.regularSummaryList li').each(
+      function (i, elem) {
+        const linkElement = $(elem).find('h3.regularSummaryHeadline a');
+        const link = 'https://cn.nytimes.com' + linkElement.attr('href');
+        const title = linkElement.text();
+        const description = $(elem).find('p.summary').text();
+
+        if (link && (title || description)) {
+          self.articles.push({
+            title,
+            description,
+            link,
+          });
+          self.toCrawl.push(link);
+        }
+      }.bind(this),
+    );
+
+    return true;
+  };
   /**
    * parseItem
    * @param {string} url - the url of the item to parse
@@ -276,45 +351,63 @@ class Nytimes extends Adapter {
       // crawl each link in the toCrawl array
       for (const link of this.toCrawl) {
         await this.page.goto(link, {
-          timeout: 10000,
+          timeout: 30000,
           waitUntil: 'domcontentloaded',
         });
-        await Promise.race([
-          this.page.waitForSelector('article#story'),
-          this.page.waitForSelector(
-            'article.live-blog-content.meteredContent[data-testid="live-blog-content"]',
-          ),
-        ]);
 
         const articleHtml = await this.page.content();
         const _$ = cheerio.load(articleHtml);
 
-        const author = _$('span[itemprop="name"]').text();
-
-
+        let author = '';
         let articleText = '';
+        let articleContent = '';
 
-        _$('div.StoryBodyCompanionColumn').each(function(i, elem) {
-          articleText += _$(this).text() + ' ';
-        });
+        if (this.locale === 'CN') {
+          // Fetch the CN article
+          author = _$('address').text();
 
-        // Select the article#story element
-        let articleContent = _$('article#story');
+          _$('div.article-paragraph').each(function (i, elem) {
+            articleText += _$(this).text() + ' ';
+          });
 
-        // Remove the div elements with id that starts with 'story-ad-'
-        articleContent.find('div[id^="story-ad-"]').remove();
-        articleContent.find('div[data-testid="brand-bar"]').remove();
-        articleContent.find('div#sponsor-wrapper').remove();
-        articleContent.find('div#top-wrapper').remove();
-        articleContent.find('div#bottom-wrapper').remove();
-        articleContent.find('div[role="toolbar"]').remove();
+          // Select the article#story element
+          articleContent = _$('article.article-content');
 
-        // Get the modified HTML content
-        articleContent = _$('<div>').append(articleContent).html();
+          // Remove the div elements with id that starts with 'story-ad-'
+          articleContent.find('div[id^="medium-rectangle-ad-"]').remove();
 
-        articleContent =
-          '<meta charset="UTF-8">' +
-          articleContent.replace(/’/g, "'").replace(/—/g, '--');
+          // Get the modified HTML content
+          articleContent = _$('<div>').append(articleContent).html();
+
+          articleContent =
+            '<meta charset="UTF-8">' +
+            articleContent.replace(/’/g, "'").replace(/—/g, '--');
+        } else if (this.locale === 'US') {
+          // Fetch the US article
+          author = _$('span.last-byline[itemprop="name"]').text() + ', ';
+
+          _$('div.StoryBodyCompanionColumn').each(function (i, elem) {
+            articleText += _$(this).text() + ' ';
+          });
+
+          // Select the article#story element
+          articleContent = _$('article#story');
+
+          // Remove the div elements with id that starts with 'story-ad-'
+          articleContent.find('div[id^="story-ad-"]').remove();
+          articleContent.find('div[data-testid="brand-bar"]').remove();
+          articleContent.find('div#sponsor-wrapper').remove();
+          articleContent.find('div#top-wrapper').remove();
+          articleContent.find('div#bottom-wrapper').remove();
+          articleContent.find('div[role="toolbar"]').remove();
+
+          // Get the modified HTML content
+          articleContent = _$('<div>').append(articleContent).html();
+
+          articleContent =
+            '<meta charset="UTF-8">' +
+            articleContent.replace(/’/g, "'").replace(/—/g, '--');
+        }
 
         // find the corresponding article in the articles array and add the author to it
         for (let article of this.articles) {
@@ -361,13 +454,24 @@ class Nytimes extends Adapter {
    * @returns
    */
   extractDateFromURL = async url => {
-    // The URL is split into an array of strings using '/' as the separator
     const splitURL = url.split('/');
+    let date;
 
-    // We know that the date parts are at the indices 3, 4 and 5 of the array
-    const [year, month, day] = splitURL.slice(3, 6);
+    if (url.includes('www.nytimes.com')) {
+      const [year, month, day] = splitURL.slice(3, 6);
+      date = `${year}-${month}-${day}`;
+    } else if (url.includes('cn.nytimes.com')) {
+      const dateString = splitURL[4]; // get the date part
+      // Reformat the string from 'YYYYMMDD' to 'YYYY-MM-DD'
+      date = `${dateString.slice(0, 4)}-${dateString.slice(
+        4,
+        6,
+      )}-${dateString.slice(6, 8)}`;
+    } else {
+      throw new Error(`Unexpected URL format: ${url}`);
+    }
 
-    return `${year}-${month}-${day}`;
+    return date;
   };
 
   /**
@@ -378,8 +482,7 @@ class Nytimes extends Adapter {
    */
   hashText = async text => {
     return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
-  }
-  
+  };
 
   /**
    * getArticleCID

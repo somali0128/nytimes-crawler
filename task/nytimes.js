@@ -10,6 +10,8 @@ const storageClient = new Web3Storage({
 });
 const { namespaceWrapper } = require('../_koiiNode/koiiNode');
 const dataFromCid = require('../helpers/dataFromCid');
+const DEBUG_MODE = process.env.DEBUG_MODE;
+const LOCALE = process.env.LOCALE;
 
 async function main(round) {
   let credentials = {
@@ -17,7 +19,7 @@ async function main(round) {
     password: process.env.NYTIMES_PASSWORD,
   };
 
-  let adapter = new Nytimes(credentials, nytimesDB, 3);
+  let adapter = new Nytimes(credentials, nytimesDB, 3, LOCALE, DEBUG_MODE);
 
   await adapter.negotiateSession();
 
