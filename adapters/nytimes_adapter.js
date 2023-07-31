@@ -414,9 +414,9 @@ class Nytimes extends Adapter {
           if (article.link === link) {
             article.author = author;
             article.releaseDate = await this.extractDateFromURL(article.link);
-            // let cid = await this.getArticleCID(round, article, articleContent);
+            let cid = await this.getArticleCID(round, article, articleContent);
             article.contentHash = await this.hashText(articleText);
-            article.cid = 'cid';
+            article.cid = cid;
             await this.db.create(article);
 
             // TEST:Use fs write the articleContent to a file, name is article title
