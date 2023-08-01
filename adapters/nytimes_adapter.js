@@ -237,6 +237,7 @@ class Nytimes extends Adapter {
       if (this.locale === 'CN') {
         return await this.fetchCNList($, self);
       } else if (this.locale === 'ES') {
+        return await this.fetchESList($, self);
       } else {
         return await this.fetchUSList($, self);
       }
@@ -330,6 +331,52 @@ class Nytimes extends Adapter {
 
     return true;
   };
+
+  /**
+   * fetchESList will fethc the list under the ES section
+   * @param {string} $ - the cheerio object
+   * @param {object} self - the this object
+   * @returns true
+   */
+  fetchESList = async ($, self) => {
+    console.log('Fetching ES List');
+
+    $('ol li').each(
+      function (i, elem) {
+        const titleElement = $(elem).find('h3 a');
+        const titleElement2 = $(elem).find('a h3');
+        const descriptionElement = $(elem).find('p').first();
+        const title = titleElement.text()
+          ? titleElement.text()
+          : titleElement2.text()
+          ? titleElement2.text()
+          : descriptionElement.text();
+        const description = titleElement.text()
+          ? descriptionElement.text()
+          : titleElement2.text()
+          ? descriptionElement.text()
+          : '';
+        const link =
+          'https://nytimes.com' +
+          (titleElement.attr('href')
+            ? titleElement.attr('href')
+            : titleElement2.parent().attr('href')
+            ? titleElement2.parent().attr('href')
+            : $(elem).find('p a').attr('href'));
+
+        if (link && (title || description)) {
+          self.articles.push({
+            title,
+            description,
+            link,
+          });
+          self.toCrawl.push(link);
+        }
+      }.bind(this),
+    );
+
+    return true;
+  };
   /**
    * parseItem
    * @param {string} url - the url of the item to parse
@@ -350,10 +397,18 @@ class Nytimes extends Adapter {
 
       // crawl each link in the toCrawl array
       for (const link of this.toCrawl) {
-        await this.page.goto(link, {
-          timeout: 30000,
-          waitUntil: 'domcontentloaded',
-        });
+        try {
+          await this.page.goto(link, {
+            timeout: 50000,
+          });
+
+          await this.page.waitForFunction(
+            'document.querySelector("div#app") && document.querySelector("div#app").innerText.length > 0',
+            { timeout: 50000 },
+          );
+        } catch (error) {
+          console.log(`Error loading page or timeout exceeded: ${error}`);
+        }
 
         const articleHtml = await this.page.content();
         const _$ = cheerio.load(articleHtml);
@@ -407,6 +462,31 @@ class Nytimes extends Adapter {
           articleContent =
             '<meta charset="UTF-8">' +
             articleContent.replace(/’/g, "'").replace(/—/g, '--');
+        } else if (this.locale === 'ES') {
+          // Fetch the US article
+          author = _$('span.last-byline[itemprop="name"]').text() + ', ';
+
+          _$('p').each(function (i, elem) {
+            articleText += _$(this).text() + ' ';
+          });
+
+          // Select the article#story element
+          articleContent = _$('article#story');
+
+          // Remove the div elements with id that starts with 'story-ad-'
+          articleContent.find('div[id^="story-ad-"]').remove();
+          articleContent.find('div[data-testid="brand-bar"]').remove();
+          articleContent.find('div#sponsor-wrapper').remove();
+          articleContent.find('div#top-wrapper').remove();
+          articleContent.find('div#bottom-wrapper').remove();
+          articleContent.find('div[role="toolbar"]').remove();
+
+          // Get the modified HTML content
+          articleContent = _$('<div>').append(articleContent).html();
+
+          articleContent =
+            '<meta charset="UTF-8">' +
+            articleContent.replace(/’/g, "'").replace(/—/g, '--');
         }
 
         // find the corresponding article in the articles array and add the author to it
@@ -414,24 +494,24 @@ class Nytimes extends Adapter {
           if (article.link === link) {
             article.author = author;
             article.releaseDate = await this.extractDateFromURL(article.link);
-            let cid = await this.getArticleCID(round, article, articleContent);
+            // let cid = await this.getArticleCID(round, article, articleContent);
             article.contentHash = await this.hashText(articleText);
-            article.cid = cid;
+            article.cid = 'cid';
             await this.db.create(article);
 
             // TEST:Use fs write the articleContent to a file, name is article title
-            // fs.writeFileSync(
-            //   `./articles/${article.title}.html`,
-            //   articleContent,
-            // );
-            // fs.writeFileSync(
-            //   `./articles/${article.title}.json`,
-            //   JSON.stringify(article),
-            // );
-            // fs.writeFileSync(
-            //   `./articles/${article.title.split('/').join('-')}.txt`,
-            //   articleText,
-            // );
+            fs.writeFileSync(
+              `./articles/${article.title}.html`,
+              articleContent,
+            );
+            fs.writeFileSync(
+              `./articles/${article.title}.json`,
+              JSON.stringify(article),
+            );
+            fs.writeFileSync(
+              `./articles/${article.title.split('/').join('-')}.txt`,
+              articleText,
+            );
 
             break;
           }
@@ -466,7 +546,10 @@ class Nytimes extends Adapter {
       date = `${dateString.slice(0, 4)}-${dateString.slice(
         4,
         6,
-      )}-${dateString.slice(6, 8)}`;
+      )}-${dateString.slice(5, 7)}`;
+    } else if (url.includes('https://nytimes.com/es/')) {
+      const [year, month, day] = splitURL.slice(5, 8);
+      date = `${year}-${month}-${day}`;
     } else {
       throw new Error(`Unexpected URL format: ${url}`);
     }
