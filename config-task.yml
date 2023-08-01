@@ -1,7 +1,7 @@
 # Name and metadata of your task
-task_name: "NYTimes Scraper v0.0.1"
+task_name: "NYTimes Scraper v0.0.2"
 author: "Soma"
-description: "This task scrapes the NYTimes website and stores the data in a file. It will fetch the list on homepage, for each it will fetch the title, author, date, and content. The content gonna upload to IPFS and save as cid. It will then store the list of data in a file and upload it to IPFS. Your submission will contain the cid of the article list and the cid of the article list. "
+description: "This task scrapes the NYTimes website and stores the data in a file. Select a locale to scrape, it will fetch the list on homepage, for each it will fetch the title, author, date, and content. The content gonna upload to IPFS and save as cid. It will then store the list of data in a file and upload it to IPFS. Your submission will contain the cid of the article list and the cid of the article list. "
 repositoryUrl: "https://github.com/somali0128/nytimes-crawler"
 imageUrl: "imageUrl"
 
@@ -40,6 +40,12 @@ requirementsTags:
   - type: TASK_VARIABLE
     value: "SECRET_WEB3_STORAGE_KEY"
     description: 'To upload the executable to IPFS, you will need a web3 storage key. You can obtain one for yourself by following the tutorial at https://blog.koii.network/Introduce-web3-storage/. This tutorial will guide you on how to get the required web3 storage key for IPFS uploading.'
+  - type: TASK_VARIABLE
+    value: "DEBUG_MODE"
+    description: 'PLEASE SET TO false. If you want to run the task in debug mode, set this to true. Doing so may interrupt the task. Debug mode will set Puppeteer to 'headless:false', causing the Chromium window to pop up during task execution.'
+  - type: TASK_VARIABLE
+    value: "LOCALE"
+    description: 'Select the locale for which you want to scrape data. Set to 'US' for the United States, 'CN' for China, and 'ES' for Spain.'
   - type: CPU
     value: "4-core"
   - type: RAM
@@ -50,7 +56,7 @@ requirementsTags:
 # OPTIONAL variables below 
 
 # OPTIONAL Only provide the taskId if you are updating the task otherwise leave blank
-task_id: "8tkU79StvYwjSSUnJHe9r4kJtXG3iwCUuzTVPfK4iMnv"
+task_id: "5JvBKywe7JLA99QT6jawbNwWUoi8cXnueXbGK8vVbB6N"
 
 # OPTIONAL only Provide your transaction ID in case of ARWEAVE and in case of DEVELOPMENT give your executable name as main otherwise leave blank
 task_audit_program_id: "main"

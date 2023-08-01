@@ -437,11 +437,11 @@ class Nytimes extends Adapter {
           articleContent =
             '<meta charset="UTF-8">' +
             articleContent.replace(/’/g, "'").replace(/—/g, '--');
-        } else if (this.locale === 'US') {
+        } else if (this.locale === 'ES') {
           // Fetch the US article
           author = _$('span.last-byline[itemprop="name"]').text() + ', ';
 
-          _$('div.StoryBodyCompanionColumn').each(function (i, elem) {
+          _$('p').each(function (i, elem) {
             articleText += _$(this).text() + ' ';
           });
 
@@ -462,11 +462,11 @@ class Nytimes extends Adapter {
           articleContent =
             '<meta charset="UTF-8">' +
             articleContent.replace(/’/g, "'").replace(/—/g, '--');
-        } else if (this.locale === 'ES') {
+        } else {
           // Fetch the US article
           author = _$('span.last-byline[itemprop="name"]').text() + ', ';
 
-          _$('p').each(function (i, elem) {
+          _$('div.StoryBodyCompanionColumn').each(function (i, elem) {
             articleText += _$(this).text() + ' ';
           });
 
@@ -494,24 +494,24 @@ class Nytimes extends Adapter {
           if (article.link === link) {
             article.author = author;
             article.releaseDate = await this.extractDateFromURL(article.link);
-            // let cid = await this.getArticleCID(round, article, articleContent);
+            let cid = await this.getArticleCID(round, article, articleContent);
             article.contentHash = await this.hashText(articleText);
-            article.cid = 'cid';
+            article.cid = cid;
             await this.db.create(article);
 
             // TEST:Use fs write the articleContent to a file, name is article title
-            fs.writeFileSync(
-              `./articles/${article.title}.html`,
-              articleContent,
-            );
-            fs.writeFileSync(
-              `./articles/${article.title}.json`,
-              JSON.stringify(article),
-            );
-            fs.writeFileSync(
-              `./articles/${article.title.split('/').join('-')}.txt`,
-              articleText,
-            );
+            // fs.writeFileSync(
+            //   `./articles/${article.title}.html`,
+            //   articleContent,
+            // );
+            // fs.writeFileSync(
+            //   `./articles/${article.title}.json`,
+            //   JSON.stringify(article),
+            // );
+            // fs.writeFileSync(
+            //   `./articles/${article.title.split('/').join('-')}.txt`,
+            //   articleText,
+            // );
 
             break;
           }
@@ -548,7 +548,7 @@ class Nytimes extends Adapter {
         6,
       )}-${dateString.slice(5, 7)}`;
     } else if (url.includes('https://nytimes.com/es/')) {
-      const [year, month, day] = splitURL.slice(5, 8);
+      const [year, month, day] = splitURL.slice(4, 7);
       date = `${year}-${month}-${day}`;
     } else {
       throw new Error(`Unexpected URL format: ${url}`);
