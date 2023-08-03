@@ -38,14 +38,14 @@ space: 1
 
 requirementsTags:
   - type: TASK_VARIABLE
+    value: "LOCALE"
+    description: 'By default, the task will fetch data from the US. If you wish to specify a different locale, select the one from which you'd like to scrape data. Options include "US" for the United States, "CN" for China, and "ES" for Spain. If you leave this field empty, the system will default to the US.'
+  - type: TASK_VARIABLE
     value: "SECRET_WEB3_STORAGE_KEY"
     description: 'To upload the executable to IPFS, you will need a web3 storage key. You can obtain one for yourself by following the tutorial at https://blog.koii.network/Introduce-web3-storage/. This tutorial will guide you on how to get the required web3 storage key for IPFS uploading.'
   - type: TASK_VARIABLE
     value: "DEBUG_MODE"
-    description: 'PLEASE SET TO false. If you want to run the task in debug mode, set this to true. Doing so may interrupt the task. Debug mode will set Puppeteer to 'headless:false', causing the Chromium window to pop up during task execution.'
-  - type: TASK_VARIABLE
-    value: "LOCALE"
-    description: 'Select the locale for which you want to scrape data. Set to 'US' for the United States, 'CN' for China, and 'ES' for Spain.'
+    description: 'The debug mode is optional and by default set to 'false'. If you wish to activate debug mode, select 'true' from the options. Leaving this field blank will keep the default setting, i.e., debug mode off. Be aware that activating debug mode might cause the task to be interrupted. When activated, the Chromium window will appear during task execution.'
   - type: CPU
     value: "4-core"
   - type: RAM
