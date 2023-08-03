@@ -38,6 +38,7 @@ class Nytimes extends Adapter {
     this.cookies = nytcookies;
     this.locale = locale || 'US';
     this.debug = debug || false;
+    this.options = {};
   }
 
   /**
@@ -49,15 +50,40 @@ class Nytimes extends Adapter {
    * 3. If the session is not valid, check if the last session check was more than 1 minute ago
    * 4. If the last session check was more than 1 minute ago, negotiate a new session
    */
-  checkSession = async () => {
-    if (this.sessionValid) {
-      return true;
-    } else if (Date.now() - this.lastSessionCheck > 60000) {
-      await this.negotiateSession();
-      return true;
-    } else {
-      return false;
-    }
+  negotiateSession = async () => {
+    // User interaction required
+    const stats = await PCR(this.options);
+    this.browser = await stats.puppeteer.launch({
+      headless: false,
+      executablePath: stats.executablePath,
+    });
+
+    this.page = await this.browser.newPage();
+    await this.page.setUserAgent(
+      'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+    );
+
+    await this.page.setViewport({ width: 1920, height: 1080 });
+
+    console.log('Wait for user to login');
+    await page.goto(
+      'https://myaccount.nytimes.com/auth/login',
+    );
+
+        // Add a listener to check for page changes
+        this.page.on('framenavigated', async () => {
+          if (this.page.url() === 'https://nytimes.com/') {
+              console.log('Page has changed to https://nytimes.com/');
+  
+              // Save the cookies
+              const cookies = await this.page.cookies();
+              console.log(cookies);
+  
+              // Close the browser
+              await this.browser.close();
+          }
+      });
+
   };
 
   /**
@@ -70,10 +96,8 @@ class Nytimes extends Adapter {
    * 4. Set the viewport size
    * 5. Queue nytimesLogin()
    */
-  negotiateSession = async () => {
-    const options = {};
-    const stats = await PCR(options);
-
+  checkSession = async () => {
+    const stats = await PCR(this.options);
     const headless = this.debug === 'true' ? false : 'new';
     this.browser = await stats.puppeteer.launch({
       headless: headless,
@@ -106,14 +130,18 @@ class Nytimes extends Adapter {
       });
     }
 
-    const [button] = await this.page.$x("//button[contains(., 'Continue')]");
-    if (!button) {
+    const [cookieButton] = await this.page.$x(
+      "//button[contains(., 'Continue')]",
+    );
+    const [loginButton] = await this.page.$x("//span[contains(., 'Log in')]");
+    if (!cookieButton && !loginButton) {
       console.log('Cookie Passed');
       this.sessionValid = true;
-      // TODO: If log in failed, close browser => open a headless:false browser => ask user login => save the cookies => run it again with new cookie
-      // await this.nytimesLogin();
-      // await this.page.waitForTimeout(1000000000);
       return true;
+    } else {
+      console.log('Cookie Failed');
+      await this.browser.close();
+      await this.nytimesLogin();
     }
     this.sessionValid = true;
 
@@ -204,7 +232,7 @@ class Nytimes extends Adapter {
   crawl = async round => {
     try {
       if (!this.sessionValid) {
-        await this.negotiateSession();
+        await this.checkSession();
       }
 
       if (this.toCrawl.length === 0) {
@@ -228,7 +256,7 @@ class Nytimes extends Adapter {
    */
   fetchList = async () => {
     if (!this.sessionValid) {
-      await this.negotiateSession();
+      await this.checkSession();
     }
     try {
       const html = await this.page.content();
@@ -387,7 +415,7 @@ class Nytimes extends Adapter {
    */
   parseItem = async round => {
     if (!this.sessionValid) {
-      await this.negotiateSession();
+      await this.checkSession();
     }
     try {
       console.log('Step: Parse Item');

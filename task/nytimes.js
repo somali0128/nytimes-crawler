@@ -21,7 +21,7 @@ async function main(round) {
 
   let adapter = new Nytimes(credentials, nytimesDB, 3, LOCALE, DEBUG_MODE);
 
-  await adapter.negotiateSession();
+  await adapter.checkSession();
 
   const articleList = await adapter.crawl(round);
   console.log(articleList);
