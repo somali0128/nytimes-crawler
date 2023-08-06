@@ -24,7 +24,7 @@ async function main(round) {
   await adapter.negotiateSession();
 
   const articleList = await adapter.crawl(round);
-  console.log(articleList);
+  // console.log(articleList);
 
   const articleListMeta = JSON.stringify(articleList);
   const articleListMetaFile = new File(
@@ -37,6 +37,7 @@ async function main(round) {
 
   const articleListCid = await storageClient.put([articleListMetaFile]);
   await proofDB.create({ articleListCid, round });
+  await adapter.stop();
 
   return articleListCid;
 }

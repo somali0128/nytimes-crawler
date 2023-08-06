@@ -270,6 +270,7 @@ class Nytimes extends Adapter {
           !link.includes('https://www.nytimes.com/live/') &&
           !link.includes('https://www.nytimes.com/interactive/') &&
           !link.includes('https://www.nytimes.com/explain/') &&
+          !link.includes('https://www.nytimes.com/wirecutter') &&
           (title || description)
         ) {
           self.articles.push({
@@ -610,7 +611,13 @@ class Nytimes extends Adapter {
    * @description Stops the crawler
    */
   stop = async () => {
-    return (this.break = true);
+    try {
+      this.browser.close();
+      return true;
+    } catch (err) {
+      console.log('ERROR IN STOP' + err);
+      return false;
+    }
   };
 }
 
