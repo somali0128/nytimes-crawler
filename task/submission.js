@@ -21,12 +21,18 @@ class Submission {
       );
       const submission = await this.fetchSubmission(roundNumber);
       console.log('SUBMISSION', submission);
-      await namespaceWrapper.checkSubmissionAndUpdateRound(
-        submission,
-        roundNumber,
-      );
-      console.log('after the submission call');
-      return submission;
+      if (submission) {
+        const response = await namespaceWrapper.checkSubmissionAndUpdateRound(
+          submission,
+          roundNumber,
+        );
+        console.log('after the submission call', response);
+        return submission;
+      } else {
+        console.log(
+          "Submission is null, that's why skipping the submission for this round",
+        );
+      }
     } catch (error) {
       console.log('error in submission', error);
     }
