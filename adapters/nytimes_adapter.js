@@ -97,21 +97,49 @@ class Nytimes extends Adapter {
     let baseURL;
 
     if (this.locale == 'CN') {
-      baseURL = 'https://cn.nytimes.com/';
+      if (this.searchterm) {
+        baseURL = 'https://cn.nytimes.com/' + `search?query=${this.searchterm}`;
+      } else {
+        baseURL = 'https://cn.nytimes.com/';
+      }
     } else if (this.locale == 'ES') {
-      baseURL = 'https://www.nytimes.com/es/';
+      if (this.searchterm) {
+        baseURL =
+          'https://www.nytimes.com/' + `search?query=${this.searchterm}`;
+      } else {
+        baseURL = 'https://www.nytimes.com/es/';
+      }
     } else {
-      baseURL = 'https://www.nytimes.com/';
-    }
-
-    // If search term exists and is not false, append it to the base URL
-    if (this.searchterm) {
-      baseURL += `search?query=${this.searchterm}`;
+      if (this.searchterm) {
+        baseURL =
+          'https://www.nytimes.com/' + `search?query=${this.searchterm}`;
+      } else {
+        baseURL = 'https://www.nytimes.com/';
+      }
     }
 
     await this.page.goto(baseURL, {
       timeout: 1000000,
     });
+
+    //Load all the articles, if we are searching for a term
+    if (this.searchterm) {
+      while (true) {
+        await this.page.evaluate(() => {
+          window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        const showMoreButton = await this.page.$(
+          '[data-testid="search-show-more-button"]',
+        );
+        if (showMoreButton) {
+          await showMoreButton.click();
+          await this.page.waitForTimeout(2000); // wait for 2 seconds
+        } else {
+          break; // exit the loop if the button is not found
+        }
+      }
+    }
 
     const [button] = await this.page.$x("//button[contains(., 'Continue')]");
     if (!button) {
@@ -122,6 +150,7 @@ class Nytimes extends Adapter {
       // await this.page.waitForTimeout(1000000000);
       return true;
     }
+
     this.sessionValid = true;
 
     return true;
