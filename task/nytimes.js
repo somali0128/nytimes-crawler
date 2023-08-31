@@ -13,13 +13,23 @@ const dataFromCid = require('../helpers/dataFromCid');
 const DEBUG_MODE = process.env.DEBUG_MODE;
 const LOCALE = process.env.LOCALE;
 
+//Import SEARCH_TERM from env, if not present, use false
+const SEARCH_TERM = process.env.SEARCH_TERM || false;
+
 async function main(round) {
   let credentials = {
     username: process.env.NYTIMES_USERNAME,
     password: process.env.NYTIMES_PASSWORD,
   };
 
-  let adapter = new Nytimes(credentials, nytimesDB, 3, LOCALE, DEBUG_MODE);
+  let adapter = new Nytimes(
+    credentials,
+    nytimesDB,
+    3,
+    LOCALE,
+    DEBUG_MODE,
+    SEARCH_TERM,
+  );
 
   await adapter.negotiateSession();
 
@@ -43,7 +53,7 @@ async function main(round) {
 }
 
 async function submit(round) {
-    try {
+  try {
     const value = await proofDB.getItem(round);
     const articleListCid = value.articleListCid;
 
@@ -65,52 +75,55 @@ async function submit(round) {
 
     const proof_cid = await storageClient.put([proofFile]);
     return proof_cid;
-    } catch (err) {
-        console.log('ERROR IN SUBMIT' + err);
-    }
+  } catch (err) {
+    console.log('ERROR IN SUBMIT' + err);
+  }
 }
 
 async function auditSubmission(submission, round) {
-    const outputraw = await dataFromCid(submission);
-    if (!outputraw) {
-        console.log('VOTE FALSE');
-        console.log('SLASH VOTE DUE TO FAKE VALUE');
-        return false;
-    }
-    const output = outputraw.data;
-    // console.log('OUTPUT', output);
-    const { value, node_pubkey, node_signature } = output;
-    const voteResp = await namespaceWrapper.verifySignature(node_signature, node_pubkey);
-    const cleanVoteRespData = voteResp.data.replace(/"/g, '');
-    
-    if (!voteResp || cleanVoteRespData !== value) {
-        console.log('cleanVoteRespData', cleanVoteRespData);
-        console.log('value received', value);
-        console.log('VOTE FALSE');
-        console.log('SLASH VOTE DUE TO DATA MISMATCH');
-        return false;
-    }
-    const articleList = await dataFromCid(value);
-    if (!articleList) {
-        console.log('VOTE FALSE');
-        console.log('SLASH VOTE DUE TO FAKE articleList CID');
-        return false;
-    }
-    if (!articleList.data) {
-        console.log('NO ARTICLE LIST DATA');
-        return true;
-    }
-    // Check if the steam special is valid
-    // If format of steam_special_resp.data is image, return true
-    // Else return false
-    if (!typeof articleList.data === 'json') {
-        console.log('VOTE FALSE');
-        console.log('SLASH VOTE DUE TO FAKE articleList');
-        return false;
-    }
+  const outputraw = await dataFromCid(submission);
+  if (!outputraw) {
+    console.log('VOTE FALSE');
+    console.log('SLASH VOTE DUE TO FAKE VALUE');
+    return false;
+  }
+  const output = outputraw.data;
+  // console.log('OUTPUT', output);
+  const { value, node_pubkey, node_signature } = output;
+  const voteResp = await namespaceWrapper.verifySignature(
+    node_signature,
+    node_pubkey,
+  );
+  const cleanVoteRespData = voteResp.data.replace(/"/g, '');
 
-    console.log('VOTE TRUE');
+  if (!voteResp || cleanVoteRespData !== value) {
+    console.log('cleanVoteRespData', cleanVoteRespData);
+    console.log('value received', value);
+    console.log('VOTE FALSE');
+    console.log('SLASH VOTE DUE TO DATA MISMATCH');
+    return false;
+  }
+  const articleList = await dataFromCid(value);
+  if (!articleList) {
+    console.log('VOTE FALSE');
+    console.log('SLASH VOTE DUE TO FAKE articleList CID');
+    return false;
+  }
+  if (!articleList.data) {
+    console.log('NO ARTICLE LIST DATA');
     return true;
+  }
+  // Check if the steam special is valid
+  // If format of steam_special_resp.data is image, return true
+  // Else return false
+  if (!typeof articleList.data === 'json') {
+    console.log('VOTE FALSE');
+    console.log('SLASH VOTE DUE TO FAKE articleList');
+    return false;
+  }
+
+  console.log('VOTE TRUE');
+  return true;
 }
 
 module.exports = { main, submit, auditSubmission };

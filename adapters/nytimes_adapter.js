@@ -20,7 +20,7 @@ const nytcookies = require('./nytcookies');
  */
 
 class Nytimes extends Adapter {
-  constructor(credentials, db, maxRetry, locale, debug) {
+  constructor(credentials, db, maxRetry, locale, debug, searchterm) {
     super(credentials, maxRetry);
     this.credentials = credentials;
     this.db = db;
@@ -38,6 +38,7 @@ class Nytimes extends Adapter {
     this.cookies = nytcookies;
     this.locale = locale || 'US';
     this.debug = debug || false;
+    this.searchterm = searchterm;
   }
 
   /**
@@ -81,6 +82,7 @@ class Nytimes extends Adapter {
     });
 
     console.log('Step: Open NYT page');
+    console.log(this.searchterm);
     this.page = await this.browser.newPage();
     await this.page.setUserAgent(
       'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
@@ -91,20 +93,25 @@ class Nytimes extends Adapter {
     // Set cookies
     await this.page.setCookie(...this.cookies);
 
-    // Check locale
+    //Edit the baseURL according to the locale
+    let baseURL;
+
     if (this.locale == 'CN') {
-      await this.page.goto('https://cn.nytimes.com/', {
-        timeout: 1000000,
-      });
+      baseURL = 'https://cn.nytimes.com/';
     } else if (this.locale == 'ES') {
-      await this.page.goto('https://www.nytimes.com/es/', {
-        timeout: 1000000,
-      });
+      baseURL = 'https://www.nytimes.com/es/';
     } else {
-      await this.page.goto('https://www.nytimes.com/', {
-        timeout: 1000000,
-      });
+      baseURL = 'https://www.nytimes.com/';
     }
+
+    // If search term exists and is not false, append it to the base URL
+    if (this.searchterm) {
+      baseURL += `search?query=${this.searchterm}`;
+    }
+
+    await this.page.goto(baseURL, {
+      timeout: 1000000,
+    });
 
     const [button] = await this.page.$x("//button[contains(., 'Continue')]");
     if (!button) {
@@ -248,42 +255,79 @@ class Nytimes extends Adapter {
   };
 
   /**
-   * fetchUSList will fethc the list under the US section
+   * fetchUSList will fetch the list under the US section
    * @param {string} $ - the cheerio object
    * @param {object} self - the this object
    * @returns true
    */
   fetchUSList = async ($, self) => {
-    console.log('Fetching US List');
-    $('section.story-wrapper a').each(
-      function (i, elem) {
-        const link = $(elem).attr('href');
-        const title = $(elem).find('h3.indicate-hover').text();
-        const description = $(elem).find('p.summary-class').text();
+    if (self.searchterm === false) {
+      console.log('Fetching US List');
+      $('section.story-wrapper a').each(
+        function (i, elem) {
+          const link = $(elem).attr('href');
+          const title = $(elem).find('h3.indicate-hover').text();
+          const description = $(elem).find('p.summary-class').text();
 
-        // check if link, title and description are not undefined or empty
-        // TODO: we need another option to fetch the following list of links
-        if (
-          link &&
-          !link.includes('https://theathletic.com/') &&
-          !link.includes('https://www.nytimes.com/video/') &&
-          !link.includes('https://www.nytimes.com/live/') &&
-          !link.includes('https://www.nytimes.com/interactive/') &&
-          !link.includes('https://www.nytimes.com/explain/') &&
-          !link.includes('https://www.nytimes.com/wirecutter') &&
-          (title || description)
-        ) {
-          self.articles.push({
-            title,
-            description,
-            link,
-          });
-          self.toCrawl.push(link);
-        }
-      }.bind(this),
-    );
+          // check if link, title and description are not undefined or empty
+          // TODO: we need another option to fetch the following list of links
+          if (
+            link &&
+            !link.includes('https://theathletic.com/') &&
+            !link.includes('https://www.nytimes.com/video/') &&
+            !link.includes('https://www.nytimes.com/live/') &&
+            !link.includes('https://www.nytimes.com/interactive/') &&
+            !link.includes('https://www.nytimes.com/explain/') &&
+            !link.includes('https://www.nytimes.com/wirecutter') &&
+            (title || description)
+          ) {
+            self.articles.push({
+              title,
+              description,
+              link,
+            });
+            self.toCrawl.push(link);
+          }
+        }.bind(this),
+      );
 
-    return true;
+      return true;
+    } else {
+      async function scrollToBottomAndClick() {}
+
+      await scrollToBottomAndClick();
+
+      console.log('Fetching US List with a search term');
+      $('ol li a').each(
+        function (i, elem) {
+          const link = 'https://www.nytimes.com/' + $(elem).attr('href');
+          const title = $(elem).find('h4').text();
+          const description = $(elem).find('p').text();
+
+          // check if link, title and description are not undefined or empty
+          // TODO: we need another option to fetch the following list of links
+          if (
+            link &&
+            !link.includes('https://theathletic.com/') &&
+            !link.includes('https://www.nytimes.com/video/') &&
+            !link.includes('https://www.nytimes.com/live/') &&
+            !link.includes('https://www.nytimes.com/interactive/') &&
+            !link.includes('https://www.nytimes.com/explain/') &&
+            !link.includes('https://www.nytimes.com/wirecutter') &&
+            (title || description)
+          ) {
+            self.articles.push({
+              title,
+              description,
+              link,
+            });
+            self.toCrawl.push(link);
+          }
+        }.bind(this),
+      );
+
+      return true;
+    }
   };
 
   /**
