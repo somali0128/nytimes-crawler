@@ -89,7 +89,9 @@ class Nytimes extends Adapter {
     await this.page.setViewport({ width: 1920, height: 1000 });
 
     // Set cookies
-    await this.page.setCookie(...this.cookies);
+    // await this.page.setCookie(...this.cookies);
+
+    await this.page.setJavaScriptEnabled(false);
 
     // Check locale
     if (this.locale == 'CN') {
