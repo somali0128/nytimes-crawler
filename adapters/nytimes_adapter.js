@@ -38,7 +38,7 @@ class Nytimes extends Adapter {
     this.cookies = nytcookies;
     this.locale = locale || 'US';
     this.debug = debug || false;
-    this.searchterm = searchterm;
+    this.searchterm = encodeURIComponent(searchterm);
   }
 
   /**
