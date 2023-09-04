@@ -14,7 +14,8 @@ const DEBUG_MODE = process.env.DEBUG_MODE;
 const LOCALE = process.env.LOCALE;
 
 //Import SEARCH_TERM from env, if not present, use false
-const SEARCH_TERM = process.env.SEARCH_TERM || false;
+const SEARCH_TERM_RAW = process.env.SEARCH_TERM || false;
+const SEARCH_TERM = encodeURIComponent(SEARCH_TERM_RAW);
 
 async function main(round) {
   let credentials = {

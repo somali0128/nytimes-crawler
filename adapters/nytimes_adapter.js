@@ -38,7 +38,7 @@ class Nytimes extends Adapter {
     this.cookies = nytcookies;
     this.locale = locale || 'US';
     this.debug = debug || false;
-    this.searchterm = searchterm;
+    this.searchterm = false;
   }
 
   /**
@@ -121,6 +121,7 @@ class Nytimes extends Adapter {
     await this.page.goto(baseURL, {
       timeout: 1000000,
     });
+    await this.page.waitForTimeout(2000); // wait for 2 seconds
 
     //Load all the articles, if we are searching for a term
     if (this.searchterm) {
@@ -145,88 +146,10 @@ class Nytimes extends Adapter {
     if (!button) {
       console.log('Cookie Passed');
       this.sessionValid = true;
-      // TODO: If log in failed, close browser => open a headless:false browser => ask user login => save the cookies => run it again with new cookie
-      // await this.nytimesLogin();
-      // await this.page.waitForTimeout(1000000000);
       return true;
     }
 
     this.sessionValid = true;
-
-    return true;
-  };
-
-  /**
-   * nytimesLogin
-   * @returns {Promise<void>}
-   * @description
-   * 1. Go to nytimes.com
-   * 2. Go to login page
-   * 3. Fill in username
-   * 4. Fill in password
-   * 5. Click login
-   * 6. Wait for login to complete
-   * 7. Check if login was successful
-   * 8. If login was successful, return true
-   * 9. If login was unsuccessful, return false
-   * 10. If login was unsuccessful, try again
-   */
-  nytimesLogin = async () => {
-    console.log('Step: Open new page');
-    let page = await browser.newPage();
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36',
-    );
-
-    // TODO - Enable console logs in the context of the page and export them for diagnostics here
-    await page.setViewport({ width: 1920, height: 1000 });
-
-    //   await page.goto('https://www.nytimes.com/', { timeout: 1000000 });
-
-    await page.waitForTimeout(3346);
-    await page.goto(
-      'https://myaccount.nytimes.com/auth/login?response_type=cookie',
-      {
-        timeout: 100000,
-      },
-    );
-
-    for (let i = 0; i < 100; i++) {
-      try {
-        const emailField = await page.$('#email');
-        if (emailField) {
-          console.log('Email inbox found');
-          console.log('Step: Type email and press Enter');
-          await page.type('#email', this.credentials.username);
-          console.log('Email found');
-          await page.keyboard.press('Enter');
-          await page.waitForNavigation({ timeout: 5000 });
-          break;
-        } else {
-          console.log('Email inbox not found' + i);
-          await page.waitForTimeout(3000);
-        }
-      } catch (err) {
-        console.log('Caught navigation error', err);
-      }
-    }
-
-    await page.waitForTimeout(2185);
-    console.log('Step: Type password and press Enter');
-    await page.type('#password', this.credentials.password);
-    console.log('Password found');
-    await page.keyboard.press('Enter');
-    await page.waitForNavigation({ timeout: 1000000 });
-    const [button] = await page.$x("//button[contains(., 'Continue')]");
-    if (button) {
-      await button.click();
-    }
-    // Wait for one second before trying again
-    await page.waitForTimeout(3456);
-    cookies = await page.cookies();
-    fs.writeFileSync('cookies.json', JSON.stringify(cookies, null, 2));
-    await page.close();
-    console.log('Step: Login successful');
 
     return true;
   };
