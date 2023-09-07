@@ -20,7 +20,7 @@ const nytcookies = require('./nytcookies');
  */
 
 class Nytimes extends Adapter {
-  constructor(credentials, db, maxRetry, locale, debug, searchterm) {
+  constructor(credentials, db, maxRetry, locale, debug, searchterm, maxPages) {
     super(credentials, maxRetry);
     this.credentials = credentials;
     this.db = db;
@@ -39,6 +39,7 @@ class Nytimes extends Adapter {
     this.locale = locale || 'US';
     this.debug = debug || false;
     this.searchterm = encodeURIComponent(searchterm);
+    this.maxPages = maxPages || 10;
   }
 
   /**
@@ -93,39 +94,63 @@ class Nytimes extends Adapter {
     // Set cookies
     await this.page.setCookie(...this.cookies);
 
-    //Edit the baseURL according to the locale
-    let baseURL;
+    async function processSearch() {
+      let baseURL;
 
-    if (this.locale == 'CN') {
-      if (this.searchterm) {
-        baseURL = 'https://cn.nytimes.com/' + `search?query=${this.searchterm}`;
+      // Set the baseURL according to locale and searchterm (if provided)
+      if (this.locale === 'CN') {
+        if (this.searchterm) {
+          baseURL =
+            'https://cn.nytimes.com/' +
+            `search?query=${this.searchterm}&sort=newest`;
+        } else {
+          baseURL = 'https://cn.nytimes.com/';
+        }
+      } else if (this.locale === 'ES') {
+        if (this.searchterm) {
+          baseURL =
+            'https://www.nytimes.com/' +
+            `search?query=${this.searchterm}&sort=newest`;
+        } else {
+          baseURL = 'https://www.nytimes.com/es/';
+        }
       } else {
-        baseURL = 'https://cn.nytimes.com/';
+        if (this.searchterm) {
+          baseURL =
+            'https://www.nytimes.com/' +
+            `search?query=${this.searchterm}&sort=newest`;
+        } else {
+          baseURL = 'https://www.nytimes.com/';
+        }
       }
-    } else if (this.locale == 'ES') {
-      if (this.searchterm) {
-        baseURL =
-          'https://www.nytimes.com/' + `search?query=${this.searchterm}`;
-      } else {
-        baseURL = 'https://www.nytimes.com/es/';
-      }
-    } else {
-      if (this.searchterm) {
-        baseURL =
-          'https://www.nytimes.com/' + `search?query=${this.searchterm}`;
-      } else {
-        baseURL = 'https://www.nytimes.com/';
+
+      await this.page.goto(baseURL, {
+        timeout: 1000000,
+      });
+      await this.page.waitForTimeout(2000); // Wait for 2 seconds
+
+      // Check if the element with the specific data-testid contains the text "Showing 0 results for"
+      const noResults = await this.page
+        .$eval('[data-testid="SearchForm-status"]', el =>
+          el.textContent.includes('0 results'),
+        )
+        .catch(e => false); // catch the error if the element is not found
+
+      if (noResults) {
+        this.searchterm = false;
+        await processSearch.call(this); // Recursively call the function
       }
     }
 
-    await this.page.goto(baseURL, {
-      timeout: 1000000,
-    });
-    await this.page.waitForTimeout(2000); // wait for 2 seconds
+    // Call the function to initiate the process
+    await processSearch.call(this);
 
+    //Set a variable to keep track of the current query page, this is used to compare with the maxPages
+    let currentQueryPage = 1;
+    console.log('maximum query pages', this.maxPages);
     //Load all the articles, if we are searching for a term
     if (this.searchterm) {
-      while (true) {
+      while (currentQueryPage < this.maxPages) {
         await this.page.evaluate(() => {
           window.scrollTo(0, document.body.scrollHeight);
         });
@@ -134,6 +159,8 @@ class Nytimes extends Adapter {
           '[data-testid="search-show-more-button"]',
         );
         if (showMoreButton) {
+          console.log(currentQueryPage);
+          currentQueryPage++;
           await showMoreButton.click();
           await this.page.waitForTimeout(2000); // wait for 2 seconds
         } else {

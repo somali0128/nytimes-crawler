@@ -15,12 +15,13 @@ const LOCALE = process.env.LOCALE;
 
 //Import SEARCH_TERM from env, if not present, use false
 let SEARCH_TERM;
-
 if (process.env.SEARCH_TERM && process.env.SEARCH_TERM.trim() !== '') {
   SEARCH_TERM = process.env.SEARCH_TERM;
 } else {
   SEARCH_TERM = false;
 }
+
+const MAX_PAGES = process.env.MAX_PAGES || 3;
 
 async function main(round) {
   let credentials = {
@@ -35,6 +36,7 @@ async function main(round) {
     LOCALE,
     DEBUG_MODE,
     SEARCH_TERM,
+    MAX_PAGES,
   );
 
   await adapter.negotiateSession();
