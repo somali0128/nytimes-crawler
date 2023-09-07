@@ -132,7 +132,7 @@ class Nytimes extends Adapter {
       // Check if the element with the specific data-testid contains the text "Showing 0 results for"
       const noResults = await this.page
         .$eval('[data-testid="SearchForm-status"]', el =>
-          el.textContent.includes('0 results'),
+          el.textContent.includes('Showing 0 results'),
         )
         .catch(e => false); // catch the error if the element is not found
 

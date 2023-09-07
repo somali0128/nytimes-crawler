@@ -21,7 +21,7 @@ if (process.env.SEARCH_TERM && process.env.SEARCH_TERM.trim() !== '') {
   SEARCH_TERM = false;
 }
 
-const MAX_PAGES = process.env.MAX_PAGES || 3;
+const MAX_PAGES = process.env.MAX_PAGES || 10;
 
 async function main(round) {
   let credentials = {
