@@ -29,20 +29,39 @@ async function main(round) {
     password: process.env.NYTIMES_PASSWORD,
   };
 
-  let adapter = new Nytimes(
-    credentials,
-    nytimesDB,
-    3,
-    LOCALE,
-    DEBUG_MODE,
-    SEARCH_TERM,
-    MAX_PAGES,
-  );
+  let alterationCheck = false;
+
+  //Decide if this round we will "alteration check" from a previous submission
+  if (round % 5 === 0) {
+    let result = await articleAlterationCheck(round);
+    alterationCheck = result.linksArray;
+    console.log('ALCHECK', alterationCheck);
+  }
+
+  let adapter = alterationCheck
+    ? new Nytimes(
+        credentials,
+        nytimesDB,
+        3,
+        LOCALE,
+        DEBUG_MODE,
+        SEARCH_TERM,
+        MAX_PAGES,
+        alterationCheck,
+      )
+    : new Nytimes(
+        credentials,
+        nytimesDB,
+        3,
+        LOCALE,
+        DEBUG_MODE,
+        SEARCH_TERM,
+        MAX_PAGES,
+      );
 
   await adapter.negotiateSession();
 
   const articleList = await adapter.crawl(round);
-  // console.log(articleList);
 
   const articleListMeta = JSON.stringify(articleList);
   const articleListMetaFile = new File(
@@ -132,6 +151,21 @@ async function auditSubmission(submission, round) {
 
   console.log('VOTE TRUE');
   return true;
+}
+
+async function articleAlterationCheck(round) {
+  //Right now, a hardcoded value is being used. This will be replaced by the n-10th round's submission.
+  //Get the selected round's submission
+  const { data: dataToCheck } = await dataFromCid(
+    'bafybeibhkdndk45jxiemtbmg7eludjqkgqhp7lx7ypmf7dt4vyx75xvsbe',
+  );
+
+  const linksArray = dataToCheck.map(item => item.link);
+  const contentHashArray = dataToCheck.map(item => item.contentHash);
+  return {
+    linksArray: linksArray,
+    contentHashArray: contentHashArray,
+  };
 }
 
 module.exports = { main, submit, auditSubmission };

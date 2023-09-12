@@ -13,7 +13,7 @@ class Submission {
 
   async submitTask(roundNumber) {
     console.log('submitTask called with round', roundNumber);
-    
+
     try {
       console.log('inside try');
       console.log(

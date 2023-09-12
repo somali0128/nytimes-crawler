@@ -20,7 +20,16 @@ const nytcookies = require('./nytcookies');
  */
 
 class Nytimes extends Adapter {
-  constructor(credentials, db, maxRetry, locale, debug, searchterm, maxPages) {
+  constructor(
+    credentials,
+    db,
+    maxRetry,
+    locale,
+    debug,
+    searchterm,
+    maxPages,
+    alterationCheck = false,
+  ) {
     super(credentials, maxRetry);
     this.credentials = credentials;
     this.db = db;
@@ -30,7 +39,7 @@ class Nytimes extends Adapter {
     this.cids = new Data('cids');
     this.cids.initializeData();
     this.articles = [];
-    this.toCrawl = [];
+    this.toCrawl = alterationCheck ? alterationCheck : [];
     this.parsed = {};
     this.lastSessionCheck = null;
     this.sessionValid = false;
@@ -195,6 +204,8 @@ class Nytimes extends Adapter {
 
       if (this.toCrawl.length === 0) {
         await this.fetchList();
+      } else {
+        console.log("Alteration Check Mode: Don't fetch list");
       }
       console.log('Step: Crawl');
       await this.parseItem(round);
@@ -516,8 +527,10 @@ class Nytimes extends Adapter {
         // find the corresponding article in the articles array and add the author to it
         for (let article of this.articles) {
           if (article.link === link) {
+            article.round = round;
             article.author = author;
             article.releaseDate = await this.extractDateFromURL(article.link);
+
             let cid = await this.getArticleCID(round, article, articleContent);
             article.contentHash = await this.hashText(articleText);
             article.cid = cid;

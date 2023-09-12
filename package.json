@@ -7,6 +7,7 @@
     "test": "jest --detectOpenHandles",
     "start": "node index.js",
     "test:unit": "node tests/unitTest.js",
+    "test:alteration": "node tests/alterationTest.js",
     "webpack": "webpack",
     "webpack:prod": "webpack --mode production"
   },
