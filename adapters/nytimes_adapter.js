@@ -39,7 +39,8 @@ class Nytimes extends Adapter {
     this.cids = new Data('cids');
     this.cids.initializeData();
     this.articles = [];
-    this.toCrawl = alterationCheck ? alterationCheck : [];
+    this.toCrawl = [];
+    this.alterationCheckData = alterationCheck ? alterationCheck : [];
     this.parsed = {};
     this.lastSessionCheck = null;
     this.sessionValid = false;
@@ -205,7 +206,6 @@ class Nytimes extends Adapter {
       if (this.toCrawl.length === 0) {
         await this.fetchList();
       } else {
-        console.log("Alteration Check Mode: Don't fetch list");
       }
       console.log('Step: Crawl');
       await this.parseItem(round);
@@ -231,6 +231,25 @@ class Nytimes extends Adapter {
       const html = await this.page.content();
       const $ = cheerio.load(html);
       const self = this;
+
+      if (this.alterationCheckData.length > 0) {
+        console.log('Alteration Check Mode On');
+        this.toCrawl = this.alterationCheckData[0];
+
+        for (let i = 0; i < this.toCrawl.length; i++) {
+          const link = this.toCrawl[i];
+          const title = this.alterationCheckData[2][i];
+          const description = this.alterationCheckData[3][i];
+          self.articles.push({
+            title,
+            description,
+            link,
+          });
+        }
+
+        return true;
+      }
+
       if (this.locale === 'CN') {
         return await this.fetchCNList($, self);
       } else if (this.locale === 'ES') {
@@ -525,14 +544,27 @@ class Nytimes extends Adapter {
         }
 
         // find the corresponding article in the articles array and add the author to it
+
         for (let article of this.articles) {
           if (article.link === link) {
+            console.log(this.articles.findIndex(a => a.link === link));
             article.round = round;
             article.author = author;
             article.releaseDate = await this.extractDateFromURL(article.link);
-
             let cid = await this.getArticleCID(round, article, articleContent);
             article.contentHash = await this.hashText(articleText);
+
+            console.log(article.contentHash);
+            if (this.alterationCheckData.length > 0) {
+              if (
+                this.alterationCheckData[1].includes(article.contentHash) ==
+                false
+              ) {
+                article.alterationFlag = true;
+                console.log('ARTICLE POTENTIALLY CHANGED!');
+              }
+            }
+
             article.cid = cid;
             await this.db.create(article);
 

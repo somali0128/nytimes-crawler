@@ -1,4 +1,5 @@
 require('dotenv').config();
+const fs = require('fs').promises;
 const Data = require('../model/data');
 const nytimesDB = new Data('nytimes');
 const proofDB = new Data('proof');
@@ -12,6 +13,8 @@ const { namespaceWrapper } = require('../_koiiNode/koiiNode');
 const dataFromCid = require('../helpers/dataFromCid');
 const DEBUG_MODE = process.env.DEBUG_MODE;
 const LOCALE = process.env.LOCALE;
+
+const { Connection, PublicKey } = require('@_koi/web3.js');
 
 //Import SEARCH_TERM from env, if not present, use false
 let SEARCH_TERM;
@@ -34,8 +37,12 @@ async function main(round) {
   //Decide if this round we will "alteration check" from a previous submission
   if (round % 5 === 0) {
     let result = await articleAlterationCheck(round);
-    alterationCheck = result.linksArray;
-    console.log('ALCHECK', alterationCheck);
+    alterationCheck = [
+      result.linksArray,
+      result.contentHashArray,
+      result.titleArray,
+      result.descriptionArray,
+    ];
   }
 
   let adapter = alterationCheck
@@ -154,17 +161,58 @@ async function auditSubmission(submission, round) {
 }
 
 async function articleAlterationCheck(round) {
-  //Right now, a hardcoded value is being used. This will be replaced by the n-10th round's submission.
-  //Get the selected round's submission
-  const { data: dataToCheck } = await dataFromCid(
-    'bafybeibhkdndk45jxiemtbmg7eludjqkgqhp7lx7ypmf7dt4vyx75xvsbe',
-  );
+  let choosenCid = null;
+  async function getCidToCheck() {
+    try {
+      const fileContent = await fs.readFile('localKOIIDB.db', 'utf8');
+
+      const lines = fileContent.trim().split('\n');
+      const eligibleLists = [];
+
+      lines.forEach(line => {
+        try {
+          const jsonObject = JSON.parse(line);
+          if (jsonObject.articleListCid) {
+            eligibleLists.push(jsonObject);
+          }
+        } catch (e) {
+          console.error('Error parsing JSON:', e);
+        }
+      });
+
+      if (eligibleLists.length > 0) {
+        let randomIndex = Math.floor(Math.random() * eligibleLists.length);
+        let value = eligibleLists[randomIndex]['articleListCid'];
+
+        while (value === null) {
+          randomIndex = Math.floor(Math.random() * eligibleLists.length);
+          value = eligibleLists[randomIndex]['articleListCid'];
+        }
+
+        return value;
+      }
+      return null;
+    } catch (err) {
+      console.error('Error reading the file:', err);
+      throw err;
+    }
+  }
+
+  choosenCid = await getCidToCheck();
+
+  const { data: dataToCheck } = await dataFromCid(choosenCid);
 
   const linksArray = dataToCheck.map(item => item.link);
+  console.log('linksArray', linksArray);
   const contentHashArray = dataToCheck.map(item => item.contentHash);
+  const titleArray = dataToCheck.map(item => item.title);
+  const descriptionArray = dataToCheck.map(item => item.description);
+
   return {
     linksArray: linksArray,
     contentHashArray: contentHashArray,
+    titleArray: titleArray,
+    descriptionArray: descriptionArray,
   };
 }
 
