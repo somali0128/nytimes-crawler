@@ -35,7 +35,7 @@ async function main(round) {
   let alterationCheck = false;
 
   //Decide if this round we will "alteration check" from a previous submission
-  if (round % 5 === 0) {
+  if ((round + 1) % 5 === 0) {
     let result = await articleAlterationCheck(round);
     alterationCheck = [
       result.linksArray,
@@ -164,7 +164,18 @@ async function articleAlterationCheck(round) {
   let choosenCid = null;
   async function getCidToCheck() {
     try {
-      const fileContent = await fs.readFile('localKOIIDB.db', 'utf8');
+      try {
+        // Try reading the first file.
+        return await fs.readFile('localKOIIDB.db', 'utf8');
+      } catch (error) {
+        if (error.code === 'ENOENT') {
+          // File not found. Try reading the fallback file.
+          return await fs.readFile('KOIIDB.db', 'utf8');
+        } else {
+          // If it's an error other than file not found, re-throw it.
+          throw error;
+        }
+      }
 
       const lines = fileContent.trim().split('\n');
       const eligibleLists = [];
