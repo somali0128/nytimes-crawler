@@ -568,6 +568,8 @@ class Nytimes extends Adapter {
             article.cid = cid;
             await this.db.create(article);
 
+/*             let testData = await this.db.getEverything();
+ */
             // TEST:Use fs write the articleContent to a file, name is article title
             // fs.writeFileSync(
             //   `./articles/${article.title}.html`,

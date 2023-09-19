@@ -163,50 +163,11 @@ async function auditSubmission(submission, round) {
 async function articleAlterationCheck(round) {
   let choosenCid = null;
   async function getCidToCheck() {
-    try {
-      try {
-        // Try reading the first file.
-        return await fs.readFile('localKOIIDB.db', 'utf8');
-      } catch (error) {
-        if (error.code === 'ENOENT') {
-          // File not found. Try reading the fallback file.
-          return await fs.readFile('KOIIDB.db', 'utf8');
-        } else {
-          // If it's an error other than file not found, re-throw it.
-          throw error;
-        }
-      }
-
-      const lines = fileContent.trim().split('\n');
-      const eligibleLists = [];
-
-      lines.forEach(line => {
-        try {
-          const jsonObject = JSON.parse(line);
-          if (jsonObject.articleListCid) {
-            eligibleLists.push(jsonObject);
-          }
-        } catch (e) {
-          console.error('Error parsing JSON:', e);
-        }
-      });
-
-      if (eligibleLists.length > 0) {
-        let randomIndex = Math.floor(Math.random() * eligibleLists.length);
-        let value = eligibleLists[randomIndex]['articleListCid'];
-
-        while (value === null) {
-          randomIndex = Math.floor(Math.random() * eligibleLists.length);
-          value = eligibleLists[randomIndex]['articleListCid'];
-        }
-
-        return value;
-      }
-      return null;
-    } catch (err) {
-      console.error('Error reading the file:', err);
-      throw err;
-    }
+    let dbToUse = await namespaceWrapper.getDb();
+    const resp = await dbToUse.find({ articleListCid: { $exists: true } }); // An empty query object retrieves all documents
+    const randomIndex = Math.floor(Math.random() * resp.length);
+    return resp[randomIndex].articleListCid;
+    /*  return 'bafybeiesw67pqnsejz76jpeinzujhaasy6aahr6s42i5ns5lh3uqdxwj5e'; */
   }
 
   choosenCid = await getCidToCheck();

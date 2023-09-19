@@ -46,13 +46,24 @@ class Data {
    * @description gets an item from the database by ID (CID)
    */
   async getItem(round) {
-    console.log('trying to retrieve with ID', {round});
+    console.log('trying to retrieve with ID', { round });
     try {
       const resp = await this.db.findOne({ round });
       return resp || null;
     } catch (e) {
       console.error(e);
       return null;
+    }
+  }
+
+  async getEverything() {
+    console.log('Trying to retrieve all items');
+    try {
+      const resp = await this.db.find({}); // An empty query object retrieves all documents
+      return resp || [];
+    } catch (e) {
+      console.error(e);
+      return [];
     }
   }
 

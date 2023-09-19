@@ -1,5 +1,5 @@
 # Name and metadata of your task
-task_name: 'NYExperiment 6'
+task_name: 'NYExperiment v11'
 author: 'Soma'
 description: 'This task scrapes the NYTimes website and stores the data in a file. Select a locale to scrape, it will fetch the list on homepage, for each it will fetch the title, author, date, and content. The content gonna upload to IPFS and save as cid. It will then store the list of data in a file and upload it to IPFS. Your submission will contain the cid of the article list and the cid of the article list. '
 repositoryUrl: 'https://github.com/somali0128/nytimes-crawler'
@@ -7,15 +7,14 @@ imageUrl: 'imageUrl'
 
 # network value can be DEVELOPMENT , ARWEAVE or IPFS, Recommended IPFS as the cli automatically takes care of uploading the executable with the help of web3.js key
 task_executable_network: 'IPFS'
-
 # Path to your executable webpack if the selected network is IPFS otherwise leave blank
 task_audit_program: 'dist/main.js'
 
 # Total round time of your task : it must be given in slots and each slot is roughly equal to 408ms
-round_time: 2000
+round_time: 700
 
-audit_window: 500
-submission_window: 500
+audit_window: 180
+submission_window: 180
 
 # Amounts in KOII
 
@@ -25,7 +24,7 @@ minimum_stake_amount: 1
 # total bounty is not accepted in case of update task
 total_bounty_amount: 10
 
-bounty_amount_per_round: 0.0001
+bounty_amount_per_round: 0.01
 
 #Number of times allowed to re-submit the distribution  list in case the distribution list is audited
 allowed_failed_distributions: 3
