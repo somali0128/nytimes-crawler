@@ -560,7 +560,7 @@ class Nytimes extends Adapter {
                 this.alterationCheckData[1].includes(article.contentHash) ==
                 false
               ) {
-                article.alterationFlag = true;
+                article.alterationFlag = this.alterationCheckData[1];
                 console.log('ARTICLE POTENTIALLY CHANGED!');
               }
             }
@@ -568,8 +568,8 @@ class Nytimes extends Adapter {
             article.cid = cid;
             await this.db.create(article);
 
-/*             let testData = await this.db.getEverything();
- */
+            /*             let testData = await this.db.getEverything();
+             */
             // TEST:Use fs write the articleContent to a file, name is article title
             // fs.writeFileSync(
             //   `./articles/${article.title}.html`,
