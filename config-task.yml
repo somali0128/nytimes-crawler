@@ -1,5 +1,7 @@
 # Name and metadata of your task
-task_name: 'NYExperiment v11'
+task_name: 'NYT Stable Beta 1'
+task_id: 'AnH6wEC3yGTKKEhBJVWzZcEnQs3fNQt8PdraY1PRmu8e'
+migrationDescription: 'test'
 author: 'Soma'
 description: 'This task scrapes the NYTimes website and stores the data in a file. Select a locale to scrape, it will fetch the list on homepage, for each it will fetch the title, author, date, and content. The content gonna upload to IPFS and save as cid. It will then store the list of data in a file and upload it to IPFS. Your submission will contain the cid of the article list and the cid of the article list. '
 repositoryUrl: 'https://github.com/somali0128/nytimes-crawler'
@@ -11,10 +13,10 @@ task_executable_network: 'IPFS'
 task_audit_program: 'dist/main.js'
 
 # Total round time of your task : it must be given in slots and each slot is roughly equal to 408ms
-round_time: 700
+round_time: 1000
 
-audit_window: 180
-submission_window: 180
+audit_window: 250
+submission_window: 250
 
 # Amounts in KOII
 
@@ -24,7 +26,7 @@ minimum_stake_amount: 1
 # total bounty is not accepted in case of update task
 total_bounty_amount: 10
 
-bounty_amount_per_round: 0.01
+bounty_amount_per_round: 0.0001
 
 #Number of times allowed to re-submit the distribution  list in case the distribution list is audited
 allowed_failed_distributions: 3

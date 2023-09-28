@@ -18,7 +18,10 @@ const { Connection, PublicKey } = require('@_koi/web3.js');
 
 //Import SEARCH_TERM from env, if not present, use false
 let SEARCH_TERM;
-if (process.env.SEARCH_TERM && process.env.SEARCH_TERM.trim() !== '') {
+
+if (process.env.SEARCH_TERM == 'default') {
+  SEARCH_TERM = false;
+} else if (process.env.SEARCH_TERM && process.env.SEARCH_TERM.trim() !== '') {
   SEARCH_TERM = process.env.SEARCH_TERM;
 } else {
   SEARCH_TERM = false;
@@ -86,19 +89,47 @@ async function main(round) {
   return articleListCid;
 }
 
+/**
+ * Asynchronously submits proof for a given round.
+ *
+ * @param {number} round - Represents the specific round or iteration for which we want to submit proof.
+ *
+ * @returns {Promise<string>} - Returns a promise that resolves to the Content Identifier (CID) of the proof.
+ */
 async function submit(round) {
   try {
-    const value = await proofDB.getItem(round);
-    const articleListCid = value.articleListCid;
+    // Retrieve the data associated with the current round from the proofDB.
+    const dbData = await proofDB.getEverything();
+    //console.log("omg", testTime);
+    //const value = await proofDB.getItem(round);
+    //console.log("hey", value);
+    //const submission_articleListCid = value.articleListCid;
+    //console.log("yo", submission_articleListCid);
 
+    let jsonToSubmit = dbData
+      .filter(item => 'articleListCid' in item)
+      .reduce(
+        (prev, current) => (prev.round > current.round ? prev : current),
+        { round: -Infinity },
+      );
+
+    if (!jsonToSubmit) {
+      jsonToSubmit = { status: 'Node is warming up!' };
+    }
+
+    // Construct the submission payload.
     const submission = {
-      value: articleListCid,
+      value: jsonToSubmit,
+      // Get the public key of the main account.
       node_pubkey: await namespaceWrapper.getMainAccountPubkey(),
-      node_signature: await namespaceWrapper.payloadSigning(articleListCid),
+      // Sign the payload using the retrieved public key.
+      node_signature: await namespaceWrapper.payloadSigning(jsonToSubmit),
     };
 
+    // Save the constructed submission payload to the proofDB.
     await proofDB.create(submission);
 
+    // Convert the submission payload to a JSON file for storage.
     const proofFile = new File(
       [JSON.stringify(submission)],
       `articleList-proof-${round}.json`,
@@ -107,9 +138,12 @@ async function submit(round) {
       },
     );
 
+    // Store the JSON file and retrieve its CID (Content Identifier).
     const proof_cid = await storageClient.put([proofFile]);
+
     return proof_cid;
   } catch (err) {
+    // Log any encountered errors.
     console.log('ERROR IN SUBMIT' + err);
   }
 }
